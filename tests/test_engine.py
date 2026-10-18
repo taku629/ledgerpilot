@@ -160,6 +160,19 @@ def test_agent_wire_over_cap_denied(ctx):
     assert "cap" in r["reply"].lower() or "could not" in r["reply"].lower()
 
 
+def test_agent_set_buffer_proposes(ctx):
+    r = _respond(ctx, "Set my cash buffer to $20,000")
+    assert r["pending_actions"], "expected a pending set_cash_buffer action"
+    assert r["pending_actions"][0]["tool"] == "set_cash_buffer"
+    assert "20,000" in r["pending_actions"][0]["preview"]
+
+
+def test_agent_set_buffer_over_cap_denied(ctx):
+    r = _respond(ctx, "Set my cash buffer to $99,999")
+    assert r["pending_actions"] == []
+    assert "cap" in r["reply"].lower() or "could not" in r["reply"].lower()
+
+
 def test_agent_dunning_draft(ctx):
     r = _respond(ctx, "Draft a payment reminder for the overdue invoice")
     assert "INV-0014" in r["reply"] or "Northwind" in r["reply"]

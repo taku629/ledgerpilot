@@ -139,6 +139,13 @@ class DeterministicBackend:
                         "memo": message[:80]})
             return self._reply(out, calls, injected_warn, pending=out)
 
+        buf = re.search(r"(set|change|update|raise|lower|adjust)\b.*?"
+                        r"(buffer|threshold|safety (net|cash))\b.*?\$?([\d,]+)", msg)
+        if buf:
+            out = call("set_cash_buffer",
+                       {"amount": float(buf.group(4).replace(",", ""))})
+            return self._reply(out, calls, injected_warn, pending=out)
+
         # ---- drafts ----
         if re.search(r"(draft|write|send).*(remind|chase|dunning|overdue|payment reminder|collect)", msg) \
                 or "reminder" in msg:
