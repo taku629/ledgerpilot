@@ -34,6 +34,18 @@ def test_forecast_beats_naive_on_scorable_categories(ctx):
         assert f["backtest"][c]["wape_model"] <= f["backtest"][c]["wape_seasonal_naive"] * 1.05, c
 
 
+def test_forecast_decomposition_sums(ctx):
+    """net_p50 must equal inflow - modeled - committed every week, and the
+    committed rows listed as evidence must total outflow_committed — guards
+    the 'evidence adds up' claim judges verify by clicking a bar."""
+    f = tools.call_tool(ctx, "get_cashflow_forecast", {})
+    for w in f["weeks"]:
+        expected = w["inflow_p50"] - w["outflow_modeled"] - w["outflow_committed"]
+        assert expected == pytest.approx(w["net_p50"], abs=0.02), w["week"]
+        committed_sum = sum(c["amount"] for c in w["committed"])
+        assert committed_sum == pytest.approx(w["outflow_committed"], abs=0.02), w["week"]
+
+
 def test_whatif_sales_drop_lowers_balance(ctx):
     base = ctx.forecast()
     scen = tools.call_tool(ctx, "what_if", {"sales_pct": -20})
