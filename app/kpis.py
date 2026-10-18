@@ -104,8 +104,36 @@ def mom_drivers(pl: list[dict], txn: pd.DataFrame) -> list[dict]:
     return drivers[:6]
 
 
+def kpi_narrative(pl: list[dict], drivers: list[dict], wc: dict) -> str:
+    """Deterministic plain-English summary of what changed, built from the
+    same numbers shown in the tables — no LLM involved."""
+    done = [p for p in pl if not p.get("partial")] or pl
+    if not done:
+        return ""
+    cur = done[-1]
+    prev = done[-2] if len(done) > 1 else None
+    parts = [f"{cur['month']}: revenue ${cur['revenue']:,.0f}, gross margin "
+             f"{cur['gross_margin_pct']}%, fixed-cost ratio "
+             f"{cur['fixed_cost_ratio_pct']}%, net ${cur['net_cashflow']:,.0f}."]
+    if prev:
+        d = cur["net_cashflow"] - prev["net_cashflow"]
+        updown = "up" if d >= 0 else "down"
+        top = ", ".join(
+            f"{dr['category']} ({'+' if dr['impact_on_net'] >= 0 else ''}"
+            f"{dr['impact_on_net']:,.0f})" for dr in drivers[:3])
+        parts.append(f"Net cash flow is {updown} ${abs(d):,.0f} vs "
+                     f"{prev['month']}, driven mainly by {top}." if top else
+                     f"Net cash flow is {updown} ${abs(d):,.0f} vs {prev['month']}.")
+    parts.append(f"Working capital: DSO {wc['dso']}d, DPO {wc['dpo']}d, "
+                 f"inventory {wc['dio']}d — cash conversion cycle "
+                 f"{wc['cash_conversion_cycle']}d.")
+    return " ".join(parts)
+
+
 def kpi_summary(txn, invoices, months=6):
     pl = monthly_pl(txn, months)
     wc = working_capital_days(txn, invoices)
+    drivers = mom_drivers(pl, txn)
     return {"monthly_pl": pl, "working_capital": wc,
-            "mom_drivers": mom_drivers(pl, txn)}
+            "mom_drivers": drivers,
+            "narrative": kpi_narrative(pl, drivers, wc)}

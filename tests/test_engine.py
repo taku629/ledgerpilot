@@ -72,6 +72,17 @@ def test_mom_drivers_numeric(ctx):
         assert isinstance(d["impact_on_net"], (int, float))
 
 
+def test_kpi_narrative_generated(ctx):
+    """The 'what changed' explanation is computed in code, not by the LLM,
+    and must quote the real month + numbers from the P/L."""
+    out = tools.call_tool(ctx, "get_kpis", {})
+    n = out["narrative"]
+    done = [p for p in out["monthly_pl"] if not p.get("partial")]
+    assert done[-1]["month"] in n
+    assert f"${done[-1]['net_cashflow']:,.0f}" in n
+    assert "DSO" in n and "DPO" in n
+
+
 # ---------- Alerts ----------
 
 def test_alerts_cover_required_types(ctx):

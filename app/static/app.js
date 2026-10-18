@@ -182,7 +182,9 @@ function renderAnalysis() {
     <td><b>${wc.cash_conversion_cycle}d</b></td></tr></table>
     <div class="fineprint">Overdue AR ${fmt(wc.overdue_receivables)} · open AR ${fmt(wc.open_receivables)}
     · 90-day window</div>`;
-  $("#drivers").innerHTML = `<table><tr><th>Category</th><th>Flow</th><th>Prev</th><th>Cur</th><th>Net impact</th></tr>` +
+  $("#drivers").innerHTML =
+    (STATE.kpis.narrative ? `<p class="narr">${esc(STATE.kpis.narrative)}</p>` : "") +
+    `<table><tr><th>Category</th><th>Flow</th><th>Prev</th><th>Cur</th><th>Net impact</th></tr>` +
     STATE.kpis.mom_drivers.map(d => `<tr><td>${esc(d.category)}</td><td>${d.flow}</td>
       <td>${fmt(d.prev)}</td><td>${fmt(d.cur)}</td>
       <td class="${d.impact_on_net < 0 ? "neg" : "pos"}">${fmt(d.impact_on_net)}</td></tr>`).join("") + "</table>";
