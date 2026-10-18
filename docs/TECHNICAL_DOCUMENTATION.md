@@ -100,6 +100,10 @@ enforces, and the owner approves**.
   spend — a café has no AP ledger); **cash conversion cycle** = DSO + DIO − DPO.
 - **MoM drivers**: category-level deltas between the last two *complete*
   months, signed by flow direction, ranked by |impact on net|.
+- **Narrative** (`kpi_narrative`): a deterministic plain-English "what
+  changed" summary assembled from the same figures — current month, net
+  delta vs the prior complete month, top drivers, working-capital days.
+  Rendered above the drivers table; computed in code, never by the LLM.
 
 ### 2.3 Financing matching (`app/financing.py`)
 
@@ -131,7 +135,7 @@ products stay visible with their reasons** ("too slow: 14d vs gap in week 2")
 ## 3. Security design
 
 See [`SECURITY_SELF_ASSESSMENT.md`](SECURITY_SELF_ASSESSMENT.md) for the full
-report. The four layers:
+report. The five layers:
 
 1. **Permission tiers on every dispatch** — `call_tool` checks the tool's
    declared tier against the session tier before running anything.
@@ -147,6 +151,14 @@ report. The four layers:
    memo so judges can watch it fail to execute.
 4. **Audit** — every tool call, denial, proposal, execution and what-if is
    appended to `data/audit_log.jsonl` with PII masking applied first.
+5. **Transport & input hardening** — every response carries CSP
+   `default-src 'self'` (all assets incl. vendored Chart.js are
+   same-origin), `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`,
+   `Permissions-Policy`. Every `POST /api/*` passes a per-client-IP
+   token bucket (12-burst, 30/min → 429 + audit event). Request bodies
+   are bounded: chat ≤ 2,000 chars, what-if params clamped
+   (`±90–200%`, AR delay ≤ 26 wk) — over-range input is a 422 before it
+   reaches the engine.
 
 ## 4. Data model
 
