@@ -55,7 +55,10 @@ uvicorn app.main:app --port 8000
 ```
 
 First run auto-generates the synthetic dataset into `data/` (deterministic,
-seeded). To regenerate: `python -m app.data_gen` or `POST /api/dev/regenerate`.
+seeded). By default the dataset ends at today's date, so figures drift a
+little each day; set `LEDGERPILOT_DATA_DATE=2026-10-18` to pin it (the hosted
+demo does). To regenerate: `python -m app.data_gen` or
+`POST /api/dev/regenerate`.
 
 ### With an LLM (optional)
 
