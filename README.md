@@ -1,5 +1,7 @@
 # LedgerPilot — SME Finance Copilot
 
+[![CI](https://github.com/taku629/ledgerpilot/actions/workflows/ci.yml/badge.svg)](https://github.com/taku629/ledgerpilot/actions/workflows/ci.yml)
+
 **2026 Shenzhen FinTechathon · International Track · Topic E**
 *Theme: "AI as a Financial Participant"*
 
@@ -76,9 +78,12 @@ See `.env.example` for all variables. Even in LLM mode the model can only
 ```bash
 docker build -t ledgerpilot . && docker run -p 8000:8000 ledgerpilot
 ```
-On Render: *New → Web Service → public repo URL → Docker → deploy.* On
-Hugging Face Spaces choose the *Docker* SDK and push this repo. No secrets are
-required for the public demo (deterministic engine + synthetic data).
+On Render: *New → Web Service → public repo URL → Docker → deploy*, or
+import `render.yaml` as a Blueprint. Hugging Face Spaces: choose the *Docker*
+SDK and push this repo. No secrets are required for the public demo
+(deterministic engine + synthetic data). Git-connected Render services created
+from a public repo URL do not receive push webhooks — redeploy with
+*Manual Deploy → Deploy latest commit* or a Render deploy hook.
 
 ## Repo layout
 
