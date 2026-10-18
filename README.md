@@ -105,6 +105,19 @@ docs/             technical doc, security self-assessment, demo script, deck
 evidence/         sandbox op log (JSONL) produced by the demo scenario
 ```
 
+## Submission deliverables (FinTechathon Topic E)
+
+| # | Deliverable | Path |
+|---|---|---|
+| 01 | Technical documentation | [docs/TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md) |
+| 02 | Presentation deck (11 slides) | [docs/PRESENTATION_DECK.md](docs/PRESENTATION_DECK.md) · [HTML slideshow](docs/PRESENTATION_DECK.html) |
+| 03 | Demo video script (≤5 min) | [docs/DEMO_VIDEO_SCRIPT.md](docs/DEMO_VIDEO_SCRIPT.md) |
+| 04 | Source + tests | this repo · `tests/` |
+| 05 | Security self-assessment | [docs/SECURITY_SELF_ASSESSMENT.md](docs/SECURITY_SELF_ASSESSMENT.md) |
+| 06 | Execution evidence | [evidence/sandbox_op_log.jsonl](evidence/sandbox_op_log.jsonl) + [evidence/demo_scenario.md](evidence/demo_scenario.md) |
+
+**Live demo:** https://ledgerpilot-vx59.onrender.com (free tier — cold start up to ~60 s)
+
 ## Tests
 
 ```bash
