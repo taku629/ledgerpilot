@@ -2,9 +2,23 @@
 (no NaN/inf leaks from pandas) and 200."""
 import json
 
+import pytest
 from fastapi.testclient import TestClient
 
-from app.main import app
+from app import sandbox
+from app.main import app, ctx
+
+
+@pytest.fixture(autouse=True)
+def _fresh_sandbox():
+    """Each API test starts from the generated baseline state — the file and
+    the in-memory schedule (built at import, so stale reschedules must be
+    re-applied too)."""
+    sandbox.STATE_PATH.unlink(missing_ok=True)
+    ctx.scheduled = sandbox.apply_reschedules(ctx.scheduled_raw)
+    yield
+    sandbox.STATE_PATH.unlink(missing_ok=True)
+
 
 client = TestClient(app)
 
@@ -58,6 +72,31 @@ def test_chat_reply_and_tool_calls():
     assert r.status_code == 200
     d = r.json()
     assert d["reply"] and d["tool_calls"]
+
+
+def test_chat_propose_approve_execute_e2e():
+    """Full Tier-2 flow over HTTP: chat proposes, owner approves, sandbox executes,
+    audit log records every step."""
+    r = client.post("/api/chat",
+                    json={"message": "reschedule pay-012 to 2026-12-08"})
+    assert r.status_code == 200
+    pend = r.json()["pending_actions"]
+    assert len(pend) == 1 and pend[0]["tool"] == "reschedule_payment"
+
+    aid = pend[0]["action_id"]
+    r2 = client.post(f"/api/actions/{aid}/approve")
+    assert r2.status_code == 200
+    res = r2.json()
+    assert res["ok"] is True
+    assert res["result"]["new_date"] == "2026-12-08"
+
+    # Replay of the same approval token must be refused (403)
+    r3 = client.post(f"/api/actions/{aid}/approve")
+    assert r3.status_code == 403
+
+    audit = client.get("/api/audit").json()["rows"]
+    kinds = [e.get("kind") for e in audit]
+    assert "sandbox_exec" in kinds or "execute" in str(kinds)
 
 
 def test_security_headers_present():

@@ -77,6 +77,23 @@ function renderChart() {
     ? `⚠️ Projected to breach the ${fmt(f.cash_buffer)} buffer in <b>week ${f.gap_week}</b> —
        minimum ${fmt(f.min_balance)}. Click a point to see that week's committed payments.`
     : `Balance stays above the ${fmt(f.cash_buffer)} buffer all 13 weeks. Min ${fmt(f.min_balance)}.`;
+  renderModelAccuracy(f.backtest);
+}
+
+function renderModelAccuracy(bt) {
+  const rows = Object.entries(bt || {}).filter(([, v]) => v.wape_model != null);
+  $("#modelAcc").innerHTML = !rows.length ? "" : `<details>
+    <summary>Forecast model accuracy — walk-forward backtest (WAPE %, lower is better)</summary>
+    <table><tr><th>Category</th><th>Model</th><th>Model WAPE</th><th>Seasonal-naive WAPE</th><th>Edge</th></tr>` +
+    rows.map(([cat, v]) => {
+      const edge = v.wape_seasonal_naive - v.wape_model;
+      return `<tr><td>${esc(cat)}</td><td>${esc(v.model)}</td><td>${v.wape_model}%</td>
+        <td>${v.wape_seasonal_naive}%</td>
+        <td class="${edge >= 0 ? "pos" : "neg"}">${edge >= 0 ? "+" : ""}${edge.toFixed(1)}pt</td></tr>`;
+    }).join("") +
+    `</table><div class="fineprint">Forecasts are produced by code only — the LLM
+     never predicts. Walk-forward validation re-fits each model on past weeks and
+     scores the held-out week.</div></details>`;
 }
 
 /* ---------------- Alerts ---------------- */

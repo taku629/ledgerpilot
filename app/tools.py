@@ -202,6 +202,22 @@ def call_tool(ctx: BusinessContext, name: str, args: dict,
     # ---- Tier-2: never executes here — creates a pending approval ----
     try:
         if name == "reschedule_payment":
+            row = ctx.scheduled[ctx.scheduled.id == a.get("payment_id")]
+            if row.empty:
+                return {"error": f"unknown payment_id {a.get('payment_id')}",
+                        "denied": True}
+            try:
+                pd.Timestamp(a.get("new_date"))
+            except Exception:
+                return {"error": f"invalid date {a.get('new_date')}",
+                        "denied": True}
+            if str(row.iloc[0].next_date) == str(a.get("new_date")):
+                ctx.audit.record({"kind": "tool_denied", "tool": name,
+                                  "args": mask_pii(args),
+                                  "reason": "payment already on that date",
+                                  "origin": origin})
+                return {"error": f"{a.get('payment_id')} is already scheduled "
+                                 f"on {a.get('new_date')}", "denied": True}
             return ctx.approvals.create(
                 {"tool": "reschedule_payment",
                  "params": {"payment_id": a.get("payment_id"),
