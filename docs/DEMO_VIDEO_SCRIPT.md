@@ -26,13 +26,21 @@ synthetic data".*
 > baseline. It projects thirteen weeks out and finds the balance dips
 > below the $30,000 buffer in week 2."
 
-**Do:** Scroll to the chart. Click a low point on the curve → evidence modal.
+**Do:** Scroll to the chart. Open the **"Forecast model accuracy"** fold under it.
+
+> "Every modeled category is backtested against a seasonal-naive
+> baseline — the table right under the chart shows the model's WAPE
+> beating the baseline on each one. The LLM never predicts a number."
+
+**Do:** Click a low point on the curve → evidence modal. Click **Move +1w**
+on a committed row — the chat proposes a reschedule (don't approve it).
 
 > "Every number has evidence — click a point and you see the committed
 > payments that drive it: payroll, the equipment installment, the tax
-> payment. No hand-waving."
+> payment. And the evidence isn't read-only: 'Move +1w' turns a payment
+> into a proposed action that still needs approval. No hand-waving."
 
-**Do:** Close modal. Point at the alert list.
+**Do:** Reject/ignore the proposal. Point at the alert list.
 
 > "And it already flagged what matters: the Northwind Catering invoice,
 > 25 days overdue — and a suspicious instruction-like text hiding in a
@@ -40,12 +48,13 @@ synthetic data".*
 
 ## Scene 3 — Business analysis (1:10–1:45)
 
-**Do:** Click the **Analysis** tab.
+**Do:** Click the **Analysis** tab. Read the narrative line above the
+drivers table.
 
-> "For 'what changed', the numbers come from code — never from the model's
-> imagination: monthly P/L, gross margin, fixed-cost ratio, DSO, DPO,
-> inventory days — and the drivers of the month-over-month change, with
-> the category amounts behind each one."
+> "For 'what changed', the numbers — and the sentence itself — come from
+> code, never from the model's imagination: monthly P/L, gross margin,
+> fixed-cost ratio, DSO, DPO, inventory days — and the drivers of the
+> month-over-month change, with the category amounts behind each one."
 
 ## Scene 4 — Financing matching (1:45–2:20)
 
@@ -80,6 +89,12 @@ synthetic data".*
 > server refuses it. Every step is in the audit log, PII-masked."
 
 ## Scene 7 — Injection defense (3:45–4:20)
+
+**Do:** Click the AR_OVERDUE alert → evidence modal → **"Draft a payment
+reminder"** button: the chat produces the dunning email for INV-0014.
+
+> "Evidence isn't a dead end either — from the overdue-invoice alert,
+> one click drafts the collection email for that exact invoice."
 
 **Do:** Click the INJECTION_ATTEMPT alert → evidence modal shows the memo.
 
