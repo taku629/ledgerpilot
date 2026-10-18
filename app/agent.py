@@ -368,8 +368,12 @@ class Agent:
                     args = json.loads(tc["function"]["arguments"] or "{}")
                 except json.JSONDecodeError:
                     args = {}
+                # Same session tier as the deterministic path: the LLM may
+                # *propose* Tier-2 actions, but only a user-clicked approval
+                # token can execute — there is no approve tool the LLM could
+                # call, and its text cannot mint one.
                 out = tools_mod.call_tool(self.ctx, name, args,
-                                          user_tier=TIER_DRAFT, origin="llm")
+                                          user_tier=TIER_SANDBOX, origin="llm")
                 calls.append({"tool": name, "args": args, "ok": "error" not in out})
                 outputs.append(out)
                 if isinstance(out, dict) and out.get("action_id"):

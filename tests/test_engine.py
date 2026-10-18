@@ -177,6 +177,29 @@ def test_agent_injected_user_message_warns(ctx):
     assert "instruction-like" in r["reply"]
 
 
+def test_llm_mode_proposes_and_never_executes(ctx, monkeypatch):
+    """Mocked LLM loop: a Tier-2 tool_call from the model yields a pending
+    action (proposal) — and there is no approve/execute tool it could call."""
+    ag = agent.Agent(ctx)
+    ag.llm.ok = True
+    script = iter([
+        {"role": "assistant", "tool_calls": [
+            {"id": "t1", "type": "function",
+             "function": {"name": "reschedule_payment",
+                          "arguments": '{"payment_id": "pay-012",'
+                                       ' "new_date": "2027-01-05"}'}}]},
+        {"role": "assistant", "content": "I've proposed moving the payment."},
+    ])
+    monkeypatch.setattr(ag.llm, "chat", lambda msgs, specs: next(script))
+    out = ag.respond("move the equipment payment")
+    assert out["pending_actions"], "LLM proposal should surface a pending action"
+    # unexecuted: only a proposal exists in sandbox state
+    assert sandbox.get_state()["rescheduled_payments"].get("pay-012") is None
+    # no tool exists that would let the model approve or execute
+    names = {t["name"] for t in tools.TOOL_DEFS}
+    assert not (names & {"approve", "approve_action", "execute_approved"})
+
+
 def test_number_guard_catches_hallucination():
     reply = "Your balance is $999,999 and min is $88,000"
     outputs = [{"balance_start": 21353.48, "min_balance": 16678.0}]
