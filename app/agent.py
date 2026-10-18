@@ -21,7 +21,7 @@ from datetime import date, timedelta
 import httpx
 
 from . import tools as tools_mod
-from .config import (DISCLAIMER, LLM_API_KEY, LLM_BASE_URL, LLM_MODEL)
+from .config import (DATA_DATE, DISCLAIMER, LLM_API_KEY, LLM_BASE_URL, LLM_MODEL)
 from .security import TIER_DRAFT, TIER_SANDBOX, scan_for_injection
 
 SYSTEM_PROMPT = """You are LedgerPilot, a finance copilot for a small business owner.
@@ -321,14 +321,15 @@ class DeterministicBackend:
             d = m2.group(1).replace("/", "-")
         else:
             n = re.search(r"(next week|in (\d+) (day|week)|by (\d+) weeks?|(\d+) weeks?)", msg)
+            today = DATA_DATE or date.today()
             if n:
                 for g in n.groups():
                     if g == "next week":
-                        d = str(date.today() + timedelta(weeks=1))
+                        d = str(today + timedelta(weeks=1))
                     elif g and g.isdigit():
-                        d = str(date.today() + timedelta(weeks=int(g)))
+                        d = str(today + timedelta(weeks=int(g)))
             elif "tomorrow" in msg:
-                d = str(date.today() + timedelta(days=1))
+                d = str(today + timedelta(days=1))
         return pid, d
 
     def _pick_invoice(self, inv, msg):
