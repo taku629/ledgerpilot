@@ -61,7 +61,8 @@ async def rate_limit(request: Request, call_next):
             audit.record({"kind": "rate_limited", "path": request.url.path,
                           "client": client})
             return JSONResponse({"detail": "rate limit exceeded — retry shortly"},
-                                status_code=429)
+                                status_code=429,
+                                headers={"Retry-After": "2"})
     return await call_next(request)
 
 

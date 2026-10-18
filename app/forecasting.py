@@ -231,7 +231,6 @@ def forecast_cashflow(txn: pd.DataFrame, sched: pd.DataFrame, profile: dict,
     extra_in = whatif.get("extra_inflow") or {}
 
     out_weeks, balance = [], float(profile["current_balance"])
-    bal_lo = bal_hi = balance
     for w in range(1, weeks + 1):
         start_d = end + timedelta(days=7 * (w - 1) + 1)
         inflow = sum(m["p50"][w - 1] for m in modeled if m["flow"] == "inflow")
@@ -244,8 +243,6 @@ def forecast_cashflow(txn: pd.DataFrame, sched: pd.DataFrame, profile: dict,
         band2 = sum(m["band"][w - 1] ** 2 for m in modeled) ** 0.5
         net = inflow - outflow_m - outflow_c
         balance += net
-        bal_lo = min(bal_lo, bal_lo + net - band2)
-        bal_hi = bal_hi + net + band2
         out_weeks.append({
             "week": w, "start": start_d.isoformat(),
             "end": (start_d + timedelta(days=6)).isoformat(),
