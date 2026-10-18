@@ -114,7 +114,7 @@ def financing():
 
 @app.post("/api/whatif")
 def whatif(w: WhatIfIn):
-    params = {k: v for k, v in w.dict().items() if v not in (0, None)}
+    params = {k: v for k, v in w.model_dump().items() if v not in (0, None)}
     fc = ctx.forecast(whatif=params, use_cache=False)
     audit.record({"kind": "what_if", "params": params})
     return {"params": params, "forecast": fc, "baseline": ctx.forecast()}
