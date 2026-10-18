@@ -290,12 +290,13 @@ class DeterministicBackend:
         if m:
             pid = m.group(1)
         else:
-            for cat in ["rent", "payroll", "loan", "utilities", "insurance",
-                        "marketing", "tax", "equipment"]:
-                if cat in msg:
-                    row = ctx.scheduled[ctx.scheduled.category.str.lower() == cat]
-                    if len(row):
-                        pid = row.iloc[0].id
+            # match any scheduled category mentioned by name, e.g. "supplies",
+            # "software", "delivery" — no hardcoded list to go stale
+            for _, r in ctx.scheduled.iterrows():
+                words = [w for w in re.split(r"[\s&/]+", str(r.category).lower())
+                         if len(w) > 2]
+                if any(re.search(rf"\b{re.escape(w)}\b", msg) for w in words):
+                    pid = r.id
                     break
         d = None
         m2 = re.search(r"(20\d\d[-/]\d\d?[-/]\d\d?)", message)
