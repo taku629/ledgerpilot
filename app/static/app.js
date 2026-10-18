@@ -215,11 +215,17 @@ function renderFinTable(m) {
 }
 
 /* ---------------- Audit ---------------- */
+function auditKindClass(k) {
+  if (/denied|flagged|limited|error|fail/i.test(k)) return "kBad";
+  if (/exec|approv|proposed/i.test(k)) return "kGood";
+  return "";
+}
+
 async function renderAudit() {
   const a = await api("/api/audit?n=60");
   $("#auditList").innerHTML = a.rows.map(e =>
     `<div class="auditRow"><span class="ts">${e.ts || ""}</span>
-     <span class="k">${esc(e.kind)}</span>
+     <span class="k ${auditKindClass(e.kind)}">${esc(e.kind)}</span>
      <span>${esc(e.tool || "")} ${esc(JSON.stringify(e.args || e.params || e.matches || e.result || e.reason || "")).slice(0, 130)}</span></div>`).join("")
     || "<div class='auditRow'>No events yet.</div>";
 }
