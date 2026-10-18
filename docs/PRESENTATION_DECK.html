@@ -72,15 +72,17 @@ pre{background:var(--panel);border:1px solid #2a3a55;border-radius:10px;padding:
 <li>Balance projected week by week; first breach of the buffer = gap week</li></ul>
 <h2>Backtest vs seasonal naive — LightGBM wins all 4 scorable categories</h2>
 <ul><li>POS <span class="ok">2.3</span> vs 2.8 · Online <span class="ok">7.5</span> vs 8.5 · Supplies <span class="ok">13.3</span> vs 15.0 · Packaging <span class="ok">9.9</span> vs 13.1 (WAPE)</li></ul>
+<p class="k">The same WAPE table ships inside the product — "Forecast model accuracy" fold under the chart.</p>
 <div class="num">5 / 11</div>
 </div>
 <div class="slide">
 <h1>The agent proposes, the owner approves</h1>
 <table><tr><th>Layer</th><th>Control</th></tr>
 <tr><td>Permission tiers</td><td>T0 read · T1 draft · T2 sandbox (approval-gated, $50k cap) · <span class="bad">T3 real-money — disabled by design</span></td></tr>
-<tr><td>Execution gate</td><td>single-use approval tokens · 300 s TTL · server-issued only · params bound at proposal time</td></tr>
+<tr><td>Execution gate</td><td>single-use approval tokens · 300 s TTL · server-issued only · params bound at proposal time · <b>no approve tool exists for the model to call</b></td></tr>
 <tr><td>Injection defense</td><td>dual-channel scanner · flagged data wrapped UNTRUSTED · INJECTION_ATTEMPT alert · live poisoned memo in the demo</td></tr>
-<tr><td>Audit</td><td>every call / proposal / execution in a JSONL log, PII-masked</td></tr></table>
+<tr><td>Audit</td><td>every call / proposal / execution / denial in a JSONL log, PII-masked</td></tr>
+<tr><td>Edge</td><td>self-only CSP · vendored assets (zero CDN) · per-IP rate limit (429+audit) · bounded inputs (422 before the engine)</td></tr></table>
 <div class="num">6 / 11</div>
 </div>
 <div class="slide">
@@ -107,6 +109,7 @@ pre{background:var(--panel);border:1px solid #2a3a55;border-radius:10px;padding:
 <div class="slide">
 <h1>Innovation &amp; interaction</h1>
 <ul><li><b>Evidence drilldown</b> — every alert and chart point jumps to the source rows</li>
+<li><b>Evidence → action</b> — "Move +1w" on a committed payment proposes a reschedule; "Draft reminder" on an overdue invoice writes the email — actionable evidence, still approval-gated</li>
 <li><b>What-if</b> — sales / supplies / receivables sliders recompute the whole projection live</li>
 <li><b>Approval cards in chat</b> — the security gate is visible, not buried</li>
 <li><b>Numbers guard</b> — LLM figures must trace to tool output (±2%) or get flagged</li>
@@ -116,7 +119,7 @@ pre{background:var(--panel);border:1px solid #2a3a55;border-radius:10px;padding:
 <div class="slide">
 <h1>Engineering &amp; tests</h1>
 <ul><li>FastAPI + vanilla-JS SPA · pandas · LightGBM · Chart.js · single-file Docker deploy</li>
-<li><b>37 pytest cases</b>: tiers, approval single-use / TTL / cap, injection in both channels, PII masking, forecast backtest, agent intents, number guard</li>
+<li><b>53 pytest cases</b>: tiers, approval single-use / TTL / cap, injection in both channels, PII masking, forecast backtest + arithmetic invariants, agent intents, mocked-LLM loop, number guard, rate limit, input bounds</li>
 <li>Repo: <span class="ok">github.com/taku629/ledgerpilot</span></li>
 <li>Ships with: README · technical docs · security self-assessment · demo script · evidence JSONL · this deck</li></ul>
 <div class="num">10 / 11</div>
