@@ -91,6 +91,12 @@ Patterns: `app/security.py::JAILBREAK_PATTERNS` (both channels) +
 - **Output encoding** — every data-derived string reaches the DOM via
   an `esc()` helper before `innerHTML`; the seeded hostile memo renders
   as inert text in the evidence modal.
+- **Rate limiting** — every `POST /api/*` (chat, what-if, approvals,
+  regenerate) passes a per-client-IP token bucket (12-burst, 30/min);
+  trips return `429` and are audit-logged (`test_rate_limit_trips_after_burst`).
+- **Input bounds** — chat messages capped at 2,000 chars; what-if
+  parameters bounded (`±90–200%`, 0–26 wk AR delay) — rejects at 422
+  before reaching the engine (`test_input_bounds_enforced`).
 
 ## 5. Known-risk register
 
