@@ -116,14 +116,17 @@ function showAlertEvidence(id) {
   const ev = a.evidence || {};
   if (ev.committed?.length) {
     html += `<h2>Committed payments — week ${ev.week}</h2><table>
-      <tr><th>Date</th><th>Category</th><th>Counterparty</th><th>Amount</th><th>ID</th></tr>` +
+      <tr><th>Date</th><th>Category</th><th>Counterparty</th><th>Amount</th><th>ID</th><th></th></tr>` +
       ev.committed.map(c => `<tr><td>${c.date}</td><td>${esc(c.category)}</td>
         <td>${esc(c.counterparty)}</td><td>${fmt(c.amount)}</td>
-        <td>${c.payment_id}</td></tr>`).join("") + "</table>";
+        <td>${c.payment_id}</td>
+        <td><button class="chip evMove" data-id="${c.payment_id}" data-d="${c.date}">Move +1w</button></td></tr>`).join("") +
+      `</table><div class="fineprint">Moving a payment is a Tier-2 sandbox action — it proposes a change that still needs your approval in chat.</div>`;
   } else if (ev.invoice_id) {
     html += `<h2>Invoice</h2><table><tr><th>ID</th><th>Customer</th><th>Due</th><th>Amount</th></tr>
       <tr><td>${ev.invoice_id}</td><td>${esc(ev.customer)}</td>
-      <td>${ev.due_date}</td><td>${fmt(ev.amount)}</td></tr></table>`;
+      <td>${ev.due_date}</td><td>${fmt(ev.amount)}</td></tr></table>
+      <div style="margin-top:12px"><button id="evAct" class="chip">Draft a payment reminder for ${esc(ev.invoice_id)}</button></div>`;
   } else if (ev.transaction_id) {
     html += `<h2>Flagged record</h2><table><tr><th>Txn</th><th>Memo</th></tr>
       <tr><td>${ev.transaction_id}</td><td>${esc(ev.memo || "")}</td></tr></table>
@@ -133,6 +136,17 @@ function showAlertEvidence(id) {
     html += `<pre>${esc(JSON.stringify(ev, null, 2))}</pre>`;
   }
   openModal(html);
+  const act = document.getElementById("evAct");
+  if (act) act.onclick = () => {
+    $("#modalBg").classList.remove("open");
+    send(`Draft a payment reminder for ${ev.invoice_id}`);
+  };
+  document.querySelectorAll(".evMove").forEach(b => b.onclick = () => {
+    const d = new Date(b.dataset.d + "T00:00:00");
+    d.setDate(d.getDate() + 7);
+    $("#modalBg").classList.remove("open");
+    send(`reschedule ${b.dataset.id} to ${d.toISOString().slice(0, 10)}`);
+  });
 }
 
 function showWeekEvidence(wk) {
