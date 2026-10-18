@@ -119,14 +119,14 @@ def kpi_narrative(pl: list[dict], drivers: list[dict], wc: dict) -> str:
         d = cur["net_cashflow"] - prev["net_cashflow"]
         updown = "up" if d >= 0 else "down"
         top = ", ".join(
-            f"{dr['category']} ({'+' if dr['impact_on_net'] >= 0 else ''}"
-            f"{dr['impact_on_net']:,.0f})" for dr in drivers[:3])
+            f"{dr['category']} ({'+' if dr['impact_on_net'] >= 0 else '-'}"
+            f"${abs(dr['impact_on_net']):,.0f})" for dr in drivers[:3])
         parts.append(f"Net cash flow is {updown} ${abs(d):,.0f} vs "
                      f"{prev['month']}, driven mainly by {top}." if top else
                      f"Net cash flow is {updown} ${abs(d):,.0f} vs {prev['month']}.")
-    parts.append(f"Working capital: DSO {wc['dso']}d, DPO {wc['dpo']}d, "
-                 f"inventory {wc['dio']}d — cash conversion cycle "
-                 f"{wc['cash_conversion_cycle']}d.")
+    parts.append(f"Working capital: DSO {wc['dso']:g}d, DPO {wc['dpo']:g}d, "
+                 f"inventory {wc['dio']:g}d — cash conversion cycle "
+                 f"{wc['cash_conversion_cycle']:g}d.")
     return " ".join(parts)
 
 
