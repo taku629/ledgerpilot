@@ -134,7 +134,7 @@ evidence/         sandbox op log (JSONL) produced by the demo scenario
 ## Tests
 
 ```bash
-python -m pytest        # 56 tests — engine + security + injection defense + API
+python -m pytest        # 57 tests — engine + security + injection defense + API
 ```
 
 ## Assumptions
