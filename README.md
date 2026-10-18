@@ -27,7 +27,9 @@ datasets, no credentials in the repo.
 | **Financing matching** | 10-product synthetic catalog (loans, factoring, credit line, MCA, trade credit, grant…) scored against the forecast gap: coverage, cost, speed vs. gap week, payment burden. Rejected options list their reasons. |
 | **Sandbox execution** | Reschedule payments, record simulated payments, change the alert threshold, draft dunning emails and loan applications. **Tier-2 actions only run after the owner clicks Approve** — and are written to the JSONL audit log. |
 | **What-if** | "Sales −20%?", "supplies +15%?", "receivables 2 weeks late?" — instant recompute on the dashboard sliders or in chat. |
-| **Evidence drilldown** | Every alert and every forecast point jumps to the underlying rows (invoices, committed payments, flagged records). |
+| **Evidence drilldown** | Every alert and every forecast point jumps to the underlying rows (invoices, committed payments, flagged records) — and the rows act back: *Move +1w* proposes a reschedule, *Draft reminder* writes the collection email. |
+| **Model accountability** | A walk-forward backtest (WAPE per category, model vs seasonal-naive) is folded under the chart — accuracy claims are inspectable, not asserted. |
+| **Deterministic narrative** | The "what changed" explanation in the Analysis tab is assembled in code from the same table rows — it can never disagree with the numbers. |
 
 ## Security model (summary)
 
@@ -43,6 +45,9 @@ datasets, no credentials in the repo.
   surfaces it as an `INJECTION_ATTEMPT` alert and never acts on it.
 - **PII masking** on tool outputs and the audit log · **API keys via env vars
   only** · number-guard that flags LLM figures not traceable to tool output.
+- **Edge hardening:** strict self-only CSP (Chart.js vendored — zero external
+  requests), `nosniff`/`DENY`/`no-referrer` headers, per-IP rate limit on
+  POST endpoints (429 + audit event), and bounded inputs on every endpoint.
 - Full write-up: [`docs/SECURITY_SELF_ASSESSMENT.md`](docs/SECURITY_SELF_ASSESSMENT.md)
 
 ## Quick start
