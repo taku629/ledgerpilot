@@ -120,7 +120,7 @@ evidence/         sandbox op log (JSONL) produced by the demo scenario
 | 01 | Technical documentation | [docs/TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md) |
 | 02 | Presentation deck (11 slides) | [docs/PRESENTATION_DECK.md](docs/PRESENTATION_DECK.md) · [HTML slideshow](docs/PRESENTATION_DECK.html) |
 | 03 | Demo video script (≤5 min) | [docs/DEMO_VIDEO_SCRIPT.md](docs/DEMO_VIDEO_SCRIPT.md) |
-| 04 | Source + tests | this repo · `tests/` |
+| 04 | Source + | this repo · `tests/` |
 | 05 | Security self-assessment | [docs/SECURITY_SELF_ASSESSMENT.md](docs/SECURITY_SELF_ASSESSMENT.md) |
 | 06 | Execution evidence | [evidence/sandbox_op_log.jsonl](evidence/sandbox_op_log.jsonl) + [evidence/demo_scenario.md](evidence/demo_scenario.md) |
 
@@ -129,7 +129,7 @@ evidence/         sandbox op log (JSONL) produced by the demo scenario
 ## Tests
 
 ```bash
-python -m pytest        # 51 tests — engine + security + injection defense + API
+python -m pytest        # 53 tests — engine + security + injection defense + API
 ```
 
 ## Assumptions
