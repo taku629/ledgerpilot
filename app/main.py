@@ -50,6 +50,22 @@ app = FastAPI(title="LedgerPilot — SME Finance Copilot",
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
+@app.middleware("http")
+async def security_headers(request, call_next):
+    """Every response gets browser-hardening headers; CSP is self-only since
+    all assets (incl. vendored Chart.js) are served from this origin."""
+    resp = await call_next(request)
+    resp.headers["Content-Security-Policy"] = (
+        "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data:; connect-src 'self'; frame-ancestors 'none'; "
+        "base-uri 'self'; form-action 'self'")
+    resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Frame-Options"] = "DENY"
+    resp.headers["Referrer-Policy"] = "no-referrer"
+    resp.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    return resp
+
+
 class ChatIn(BaseModel):
     message: str
 

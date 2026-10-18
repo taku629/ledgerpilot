@@ -60,6 +60,15 @@ def test_chat_reply_and_tool_calls():
     assert d["reply"] and d["tool_calls"]
 
 
+def test_security_headers_present():
+    r = client.get("/")
+    h = r.headers
+    assert "default-src 'self'" in h["content-security-policy"]
+    assert "script-src 'self'" in h["content-security-policy"]
+    assert h["x-content-type-options"] == "nosniff"
+    assert h["x-frame-options"] == "DENY"
+
+
 def test_unknown_endpoint_404_json():
     r = client.get("/api/nope")
     assert r.status_code == 404

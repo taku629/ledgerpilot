@@ -81,6 +81,16 @@ Patterns: `app/security.py::JAILBREAK_PATTERNS` (both channels) +
   the owner.
 - **Dependency hygiene** — pinned-ish requirements, no eval/exec of
   model output, no client-side tool execution.
+- **Browser hardening** — strict `Content-Security-Policy`
+  (`default-src 'self'`, scripts self-only), `X-Frame-Options: DENY`,
+  `nosniff`, `no-referrer`, `Permissions-Policy` on every response
+  (`test_security_headers_present`). All front-end assets are served
+  from the app origin — Chart.js is vendored under
+  `app/static/vendor/` (MIT), so no third-party CDN can inject script
+  into the page.
+- **Output encoding** — every data-derived string reaches the DOM via
+  an `esc()` helper before `innerHTML`; the seeded hostile memo renders
+  as inert text in the evidence modal.
 
 ## 5. Known-risk register
 
