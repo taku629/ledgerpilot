@@ -18,7 +18,13 @@ and the known-risk register with mitigations.
 
 Server-side check: `app/tools.py::call_tool` → `app/security.py::check_tier`.
 The LLM (or deterministic engine) never executes a tool directly — it can
-only *ask* for a tool call, which passes through the same gate.
+only *ask* for a tool call, which passes through the same gate. LLM-origin
+calls run at the owner's session tier (Tier 2), so the model may *propose*
+a sandbox action — but a proposal mints no executable state. The only path
+to execution is the user-clicked approval below; **no tool exists that the
+model could call to approve or execute** (verified by
+`test_llm_mode_proposes_and_never_executes`, which drives the LLM tool loop
+with a mocked backend and asserts the action stays unexecuted).
 
 Verified by: `tests/test_security.py`
 (`test_tier1_cannot_propose_tier2`, `test_tier3_always_refused`,
