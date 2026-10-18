@@ -238,7 +238,7 @@ class DeterministicBackend:
             return self._reply({"text": "\n".join(lines)}, calls, injected_warn,
                                data={"financing": m})
 
-        if re.search(r"(alert|risk|warn|attention|problem)", msg):
+        if re.search(r"(alert|risk|warn|attention|problem|suspicious|fraud|injection)", msg):
             al = call("get_alerts")
             lines = [f"{al['count']} active alerts:"] + [
                 f"- [{a['severity'].upper()}] {a['title']}" for a in al["alerts"][:8]]
