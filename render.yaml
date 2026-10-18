@@ -1,0 +1,21 @@
+# One-click Render deploy: New + → Blueprint → pick this repo.
+services:
+  - type: web
+    name: ledgerpilot
+    runtime: docker
+    plan: free
+    healthCheckPath: /healthz
+    envVars:
+      - key: LEDGERPILOT_MAX_ACTION_AMOUNT
+        value: "50000"
+      - key: LEDGERPILOT_APPROVAL_TTL
+        value: "300"
+      - key: LEDGERPILOT_CASH_BUFFER
+        value: "30000"
+      # LLM backend is optional — the deterministic engine runs without it:
+      # - key: LLM_BASE_URL
+      #   value: https://api.openai.com/v1
+      # - key: LLM_API_KEY
+      #   sync: false   # set via dashboard secret
+      # - key: LLM_MODEL
+      #   value: gpt-4o-mini
