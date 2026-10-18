@@ -115,7 +115,7 @@ Patterns: `app/security.py::JAILBREAK_PATTERNS` (both channels) +
 | Demo has no auth | N/A (demo) | Medium in prod | documented assumption; tier model is auth-agnostic and drops behind real auth unchanged |
 | Sandbox state file corruption | Low | Low | single-writer + atomic writes; regenerate endpoint |
 | Free-tier spin-down | High | Low (demo UX) | documented in README; cold start < ~60 s |
-| `/api/dev/regenerate` is unauthenticated | Medium | Low | demo-only data wipe; rate-limited (429) and fully audited; in production this endpoint would sit behind admin auth |
+| `/api/dev/regenerate` is unauthenticated | Medium | Low | demo-only data reset; rate-limited (429); the audit log is deliberately NOT wiped and the regenerate itself is logged; in production this endpoint would sit behind admin auth |
 | Amount cap bypass via non-`amount` params | Low | Low | cap evaluated on `params.amount`; other Tier-2 tools (reschedule, buffer) carry no spend |
 
 ## 6. What is deliberately out of scope
