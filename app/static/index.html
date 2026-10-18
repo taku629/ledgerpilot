@@ -1,0 +1,100 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>LedgerPilot — SME Finance Copilot</title>
+<link rel="stylesheet" href="/static/styles.css">
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.7/dist/chart.umd.min.js"></script>
+</head>
+<body>
+<header>
+  <div class="brand">
+    <div class="logo">LP</div>
+    <div>
+      <h1>LedgerPilot</h1>
+      <div class="sub" id="bizName">SME Finance Copilot</div>
+    </div>
+  </div>
+  <div class="badges">
+    <span class="badge" id="llmBadge">…</span>
+    <span class="badge tier">Tier 2 sandbox · approval-gated</span>
+    <span class="badge synthetic">100% synthetic data</span>
+  </div>
+</header>
+
+<main>
+  <!-- ===================== CHAT ===================== -->
+  <section id="chatPane">
+    <div id="chatLog"></div>
+    <div class="suggestions">
+      <button data-q="Give me the 13-week cash flow forecast">13-week forecast</button>
+      <button data-q="Why did profit change? Run the KPI analysis">KPI analysis</button>
+      <button data-q="What financing options cover the gap?">Financing options</button>
+      <button data-q="What if sales drop 20%?">What-if: sales -20%</button>
+      <button data-q="Draft a payment reminder for the overdue invoice">Dunning draft</button>
+      <button data-q="Reschedule the equipment payment to 2027-01-05">Reschedule equipment</button>
+    </div>
+    <form id="chatForm">
+      <input id="chatInput" autocomplete="off" placeholder="Ask LedgerPilot… e.g. 'forecast cash flow', 'what if sales drop 20%', 'draft a loan application'">
+      <button type="submit">Send</button>
+    </form>
+    <div class="fineprint" id="disclaimer"></div>
+  </section>
+
+  <!-- ===================== DASHBOARD ===================== -->
+  <section id="dash">
+    <div id="kpiStrip"></div>
+
+    <div class="card">
+      <div class="cardHead">
+        <h2>13-week cash-flow forecast</h2>
+        <div class="whatif">
+          <label>Sales <input type="range" id="wiSales" min="-50" max="30" value="0"><span id="wiSalesV">0%</span></label>
+          <label>Supplies <input type="range" id="wiSup" min="-20" max="50" value="0"><span id="wiSupV">0%</span></label>
+          <label>AR delay <input type="range" id="wiAR" min="0" max="6" value="0"><span id="wiARV">0w</span></label>
+          <button id="wiApply">Apply what-if</button>
+          <button id="wiReset" class="ghost">Reset</button>
+        </div>
+      </div>
+      <div class="chartWrap"><canvas id="cfChart"></canvas></div>
+      <div id="gapNote"></div>
+    </div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="alerts">Alerts <span id="alertCount"></span></button>
+      <button class="tab" data-tab="analysis">Analysis</button>
+      <button class="tab" data-tab="financing">Financing</button>
+      <button class="tab" data-tab="audit">Audit log</button>
+      <button class="tab" data-tab="data">Transactions</button>
+    </div>
+
+    <div class="tabPane active" id="tab-alerts"><div id="alertsList"></div></div>
+
+    <div class="tabPane" id="tab-analysis">
+      <div class="grid2">
+        <div class="card"><h2>Monthly P/L</h2><div id="plTable"></div></div>
+        <div class="card"><h2>Working capital</h2><div id="wcDays"></div>
+          <h2 style="margin-top:18px">MoM drivers (last complete month)</h2><div id="drivers"></div></div>
+      </div>
+    </div>
+
+    <div class="tabPane" id="tab-financing"><div id="finTable"></div>
+      <div class="fineprint" id="finDisc"></div></div>
+
+    <div class="tabPane" id="tab-audit"><div id="auditList"></div></div>
+
+    <div class="tabPane" id="tab-data">
+      <div class="row">
+        <select id="txnMonths"><option value="1">Last month</option><option value="3" selected>Last 3 months</option><option value="6">Last 6 months</option></select>
+        <input id="txnFilter" placeholder="filter (category / counterparty / memo)">
+      </div>
+      <div id="txnTable"></div>
+    </div>
+  </section>
+</main>
+
+<div id="modalBg"><div id="modal"><button id="modalX">×</button><div id="modalBody"></div></div></div>
+<script src="/static/app.js"></script>
+</body>
+</html>

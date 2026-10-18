@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+.env
+data/*.jsonl
+data/sandbox_state.json
+data/transactions.csv
+data/invoices.csv
+data/scheduled_payments.csv
+data/financing_catalog.json
+data/business_profile.json
+.pytest_cache/
+.DS_Store

@@ -1,0 +1,8 @@
+{"kind": "tool_call", "tool": "get_cashflow_forecast", "args": {}, "tier": 0, "origin": "user", "ts": "2026-10-18T12:57:16Z", "event_id": "evt-7e2a63be65"}
+{"kind": "tool_call", "tool": "get_alerts", "args": {}, "tier": 0, "origin": "user", "ts": "2026-10-18T12:57:34Z", "event_id": "evt-65e6d68b73"}
+{"kind": "tool_call", "tool": "get_kpis", "args": {}, "tier": 0, "origin": "user", "ts": "2026-10-18T12:57:35Z", "event_id": "evt-672037c848"}
+{"kind": "tool_call", "tool": "get_cashflow_forecast", "args": {}, "tier": 0, "origin": "user", "ts": "2026-10-18T12:57:35Z", "event_id": "evt-a51b549a85"}
+{"kind": "tool_call", "tool": "match_financing", "args": {}, "tier": 0, "origin": "user", "ts": "2026-10-18T12:57:35Z", "event_id": "evt-7986ad878b"}
+{"kind": "tool_call", "tool": "draft_dunning_email", "args": {"invoice_id": "INV-0014"}, "tier": 1, "origin": "user", "ts": "2026-10-18T12:57:35Z", "event_id": "evt-58fa5ab85d"}
+{"kind": "tool_call", "tool": "reschedule_payment", "args": {"payment_id": "pay-012", "new_date": "2027-01-05"}, "tier": 2, "origin": "user", "ts": "2026-10-18T12:57:35Z", "event_id": "evt-1a08638688"}
+{"kind": "action_executed", "action_id": "appr-45c64ee98d08", "tool": "reschedule_payment", "params": {"payment_id": "pay-012", "new_date": "2027-01-05"}, "result": {"ok": true, "payment_id": "pay-012", "old_date": "2026-12-01", "new_date": "2027-01-05", "category": "Equipment", "amount": 16000.0}, "ts": "2026-10-18T12:57:35Z", "event_id": "evt-84fec883ee"}
