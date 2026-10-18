@@ -1,6 +1,7 @@
 """LedgerPilot API + static UI."""
 from __future__ import annotations
 
+import math
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException
@@ -19,6 +20,23 @@ from . import kpis as kpis_mod
 
 STATIC = Path(__file__).parent / "static"
 
+
+def _nan_clean(o):
+    """Replace non-finite floats (NaN/inf from pandas) so JSON never 500s."""
+    if isinstance(o, float):
+        return o if math.isfinite(o) else None
+    if isinstance(o, dict):
+        return {k: _nan_clean(v) for k, v in o.items()}
+    if isinstance(o, (list, tuple)):
+        return [_nan_clean(v) for v in o]
+    return o
+
+
+class CleanJSONResponse(JSONResponse):
+    def render(self, content):
+        return super().render(_nan_clean(content))
+
+
 audit = AuditLog()
 approvals = ApprovalStore()
 ctx = BusinessContext(load_all(), audit, approvals)
@@ -27,7 +45,8 @@ agent = Agent(ctx)
 app = FastAPI(title="LedgerPilot — SME Finance Copilot",
               description="AI agent that completes SME finance tasks end-to-end "
                           "with permission tiers, approvals and a full audit trail. "
-                          "Demo data is 100% synthetic.")
+                          "Demo data is 100% synthetic.",
+              default_response_class=CleanJSONResponse)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
 
 
