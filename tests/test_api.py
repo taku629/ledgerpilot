@@ -131,6 +131,14 @@ def test_input_bounds_enforced():
     assert r.status_code == 422
 
 
+def test_regenerate_preserves_audit_trail():
+    r = client.post("/api/dev/regenerate")
+    assert r.status_code == 200
+    rows = client.get("/api/audit").json()["rows"]
+    assert rows, "audit log must survive a data reset"
+    assert any(e.get("kind") == "data_regenerated" for e in rows)
+
+
 def test_rate_limit_trips_after_burst():
     from app.main import chat_limiter
     chat_limiter._buckets.clear()
