@@ -53,6 +53,9 @@ def exec_reschedule_payment(sched: pd.DataFrame, payment_id: str,
         pd.Timestamp(new_date)
     except Exception:
         return {"ok": False, "error": f"invalid date {new_date}"}
+    if str(old) == new_date:
+        return {"ok": False,
+                "error": f"{payment_id} is already scheduled on {new_date}"}
     s = _load_state()
     s["rescheduled_payments"][payment_id] = new_date
     _save_state(s)

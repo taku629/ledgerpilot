@@ -185,3 +185,11 @@ def test_replay_of_consumed_token_rejected(ctx):
     assert tools.execute_approved(ctx, action)["ok"] is True
     with pytest.raises(ApprovalError):
         ctx.approvals.consume(aid)
+
+
+def test_reschedule_to_same_date_rejected(ctx):
+    row = ctx.scheduled[ctx.scheduled.id == "pay-012"].iloc[0]
+    res = sandbox.exec_reschedule_payment(ctx.scheduled, "pay-012",
+                                          str(row.next_date))
+    assert res["ok"] is False
+    assert "already scheduled" in res["error"]
