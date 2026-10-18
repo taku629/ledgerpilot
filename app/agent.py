@@ -113,10 +113,22 @@ class DeterministicBackend:
             if pid and new_date:
                 out = call("reschedule_payment", {"payment_id": pid, "new_date": new_date})
                 return self._reply(out, calls, injected_warn, pending=out)
+            if pid:
+                row = ctx.scheduled[ctx.scheduled.id == pid]
+                if len(row):
+                    r = row.iloc[0]
+                    return self._reply(
+                        {"text": f"`{pid}` {r.category} {_fmt(r.amount)} is due "
+                                 f"{r.next_date}. What date should I move it to? "
+                                 f"(e.g. \"reschedule {pid} to 2026-12-08\")"},
+                        calls, injected_warn)
             fc = call("get_cashflow_forecast")
-            return self._reply({"text": "Which scheduled payment? Candidates:\n" + "\n".join(
+            cands = sorted((c for w in fc["weeks"] for c in w["committed"]),
+                           key=lambda c: c["date"])[:5]
+            return self._reply({"text": "Which scheduled payment? Soonest ones:\n" + "\n".join(
                 f"- `{c['payment_id']}` {c['category']} {_fmt(c['amount'])} on {c['date']}"
-                for w in fc["weeks"] for c in w["committed"][:6])}, calls, injected_warn)
+                for c in cands) + f"\n(e.g. \"reschedule {cands[0]['payment_id']} to 2026-12-08\")"},
+                calls, injected_warn)
 
         wire = re.search(r"(wire|pay|send)\s*\$?([\d,]+)", msg)
         if wire:
