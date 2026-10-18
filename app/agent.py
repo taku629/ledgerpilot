@@ -186,6 +186,23 @@ class DeterministicBackend:
             return self._reply({"text": txt}, calls, injected_warn,
                                data={"whatif_result": out})
 
+        # ---- model accuracy ----
+        if re.search(r"(accur|wape|backtest|reliab|how (good|accurate)|trust)", msg):
+            fc = call("get_cashflow_forecast")
+            bt = fc.get("backtest") or {}
+            if not bt:
+                return self._reply({"text": "No backtest available — not enough history."},
+                                   calls, injected_warn)
+            rows = [(c, b["wape_model"], b["wape_seasonal_naive"])
+                    for c, b in sorted(bt.items())]
+            wins = sum(1 for _, m_, n_ in rows if m_ <= n_)
+            lines = ["**Forecast accuracy** — walk-forward backtest, WAPE (lower is better):",
+                     "", "| Category | Model | Seasonal naive |", "|---|---|---|"]
+            lines += [f"| {c} | {m_}% | {n_}% |" for c, m_, n_ in rows]
+            lines.append(f"\nThe fitted model beats the seasonal-naive baseline on "
+                         f"**{wins}/{len(rows)}** categories. Full table under the chart.")
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
         # ---- analysis ----
         if re.search(r"(forecast|cash ?flow|runway|13.week|next.*weeks|projection)", msg):
             fc = call("get_cashflow_forecast")

@@ -173,6 +173,12 @@ def test_agent_set_buffer_over_cap_denied(ctx):
     assert "cap" in r["reply"].lower() or "could not" in r["reply"].lower()
 
 
+def test_agent_accuracy_intent(ctx):
+    r = _respond(ctx, "how accurate is your forecast?")
+    assert "WAPE" in r["reply"] and "Seasonal naive" in r["reply"]
+    assert any(t["tool"] == "get_cashflow_forecast" for t in r["tool_calls"])
+
+
 def test_agent_dunning_draft(ctx):
     r = _respond(ctx, "Draft a payment reminder for the overdue invoice")
     assert "INV-0014" in r["reply"] or "Northwind" in r["reply"]
