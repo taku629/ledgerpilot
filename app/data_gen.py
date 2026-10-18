@@ -18,7 +18,8 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
-from .config import DATA_DIR, DEFAULT_CASH_BUFFER, DEMO_BUSINESS_NAME
+from .config import (DATA_DATE, DATA_DIR, DEFAULT_CASH_BUFFER,
+                     DEMO_BUSINESS_NAME)
 
 DAYS = 456  # ~15 months of history
 START_BALANCE = 14_000.0
@@ -32,7 +33,7 @@ def _daterange(end: date, days: int):
 def generate(end: date | None = None, out_dir: Path = DATA_DIR) -> dict:
     rng = np.random.default_rng(20261018)
     random.seed(20261018)
-    end = end or date.today()
+    end = end or DATA_DATE or date.today()
     start, days = _daterange(end, DAYS)
     out_dir.mkdir(parents=True, exist_ok=True)
 

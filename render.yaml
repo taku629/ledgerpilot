@@ -12,6 +12,10 @@ services:
         value: "300"
       - key: LEDGERPILOT_CASH_BUFFER
         value: "30000"
+      # Freeze the generated dataset at the date the demo script/deck were
+      # captured against (seed anchor) so hosted figures stay reproducible.
+      - key: LEDGERPILOT_DATA_DATE
+        value: "2026-10-18"
       # LLM backend is optional — the deterministic engine runs without it:
       # - key: LLM_BASE_URL
       #   value: https://api.openai.com/v1

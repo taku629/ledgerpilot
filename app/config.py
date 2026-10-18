@@ -1,5 +1,6 @@
 """Runtime configuration — everything sensitive comes from env vars only."""
 import os
+from datetime import date
 from pathlib import Path
 
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -19,6 +20,11 @@ MAX_SANDBOX_ACTION_AMOUNT = float(os.environ.get("LEDGERPILOT_MAX_ACTION_AMOUNT"
 APPROVAL_TTL_SECONDS = int(os.environ.get("LEDGERPILOT_APPROVAL_TTL", "300"))
 # Minimum cash buffer used for "balance below threshold" alerts.
 DEFAULT_CASH_BUFFER = float(os.environ.get("LEDGERPILOT_CASH_BUFFER", "15000"))
+
+# Anchor date for the generated dataset; unset = today (data drifts daily).
+# Pin it (e.g. on a hosted demo) so scripted figures stay reproducible.
+_DATA_DATE = os.environ.get("LEDGERPILOT_DATA_DATE", "")
+DATA_DATE = date.fromisoformat(_DATA_DATE) if _DATA_DATE else None
 
 DEMO_BUSINESS_NAME = os.environ.get("LEDGERPILOT_BUSINESS", "Harbor & Bean Roasters")
 
