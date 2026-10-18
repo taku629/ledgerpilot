@@ -9,7 +9,8 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
 
 from .agent import Agent
-from .config import DATA_DIR, DISCLAIMER, LLM_BASE_URL
+from . import sandbox
+from .config import DATA_DIR, DISCLAIMER, LLM_BASE_URL, AUDIT_LOG
 from .data_gen import generate, load_all
 from .security import (ApprovalError, ApprovalStore, AuditLog,
                        scan_for_injection)
@@ -150,6 +151,11 @@ def audit_tail(n: int = 60):
 
 @app.post("/api/dev/regenerate")
 def regenerate():
+    for p in (sandbox.STATE_PATH, AUDIT_LOG):
+        try:
+            p.unlink(missing_ok=True)
+        except OSError:
+            pass
     generate(out_dir=DATA_DIR)
     return {"ok": True}
 
