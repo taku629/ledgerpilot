@@ -184,6 +184,29 @@ def fingerprint(params: dict) -> str:
     return hashlib.sha256(json.dumps(params, sort_keys=True).encode()).hexdigest()[:16]
 
 
+# ------------------------------------------------------------- rate limiting
+class RateLimiter:
+    """Per-client token bucket. Fail-closed on clock issues; in-memory only —
+    a single-process demo store, documented as such (no shared state needed)."""
+
+    def __init__(self, rate_per_min: int = 60, burst: int = 20):
+        self.rate = rate_per_min / 60.0
+        self.burst = burst
+        self._buckets: dict[str, list[float]] = {}
+        self._lock = threading.Lock()
+
+    def allow(self, client: str) -> bool:
+        now = time.monotonic()
+        with self._lock:
+            tokens, last = self._buckets.get(client, (self.burst, now))
+            tokens = min(self.burst, tokens + (now - last) * self.rate)
+            if tokens < 1:
+                self._buckets[client] = (tokens, now)
+                return False
+            self._buckets[client] = (tokens - 1, now)
+            return True
+
+
 def check_tier(tool_tier: int, context_tier: int):
     if tool_tier > context_tier:
         raise TierError(f"tool requires Tier {tool_tier} ({TIER_NAMES[tool_tier]}); "

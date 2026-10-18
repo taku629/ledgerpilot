@@ -16,6 +16,8 @@ def _fresh_sandbox():
     re-applied too)."""
     sandbox.STATE_PATH.unlink(missing_ok=True)
     ctx.scheduled = sandbox.apply_reschedules(ctx.scheduled_raw)
+    from app.main import chat_limiter
+    chat_limiter._buckets.clear()
     yield
     sandbox.STATE_PATH.unlink(missing_ok=True)
 
@@ -118,3 +120,22 @@ def test_error_handler_returns_json_not_traceback():
     r = client.post("/api/chat", json={})  # missing required field -> 422
     assert r.status_code == 422
     assert "Traceback" not in r.text
+
+
+def test_input_bounds_enforced():
+    r = client.post("/api/chat", json={"message": "x" * 2001})
+    assert r.status_code == 422
+    r = client.post("/api/whatif", json={"sales_pct": -500})
+    assert r.status_code == 422
+    r = client.post("/api/whatif", json={"ar_delay_weeks": 52})
+    assert r.status_code == 422
+
+
+def test_rate_limit_trips_after_burst():
+    from app.main import chat_limiter
+    chat_limiter._buckets.clear()
+    for _ in range(12):
+        r = client.post("/api/chat", json={"message": "hi"})
+        assert r.status_code == 200
+    r = client.post("/api/chat", json={"message": "hi"})
+    assert r.status_code == 429

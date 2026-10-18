@@ -4,16 +4,16 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from .agent import Agent
 from . import sandbox
 from .config import DATA_DIR, DISCLAIMER, LLM_BASE_URL, AUDIT_LOG
 from .data_gen import generate, load_all
-from .security import (ApprovalError, ApprovalStore, AuditLog,
+from .security import (ApprovalError, ApprovalStore, AuditLog, RateLimiter,
                        scan_for_injection)
 from .tools import BusinessContext, call_tool, execute_approved
 from . import kpis as kpis_mod
@@ -39,6 +39,7 @@ class CleanJSONResponse(JSONResponse):
 
 audit = AuditLog()
 approvals = ApprovalStore()
+chat_limiter = RateLimiter(rate_per_min=30, burst=12)
 ctx = BusinessContext(load_all(), audit, approvals)
 agent = Agent(ctx)
 
@@ -48,6 +49,20 @@ app = FastAPI(title="LedgerPilot — SME Finance Copilot",
                           "Demo data is 100% synthetic.",
               default_response_class=CleanJSONResponse)
 app.mount("/static", StaticFiles(directory=STATIC), name="static")
+
+
+@app.middleware("http")
+async def rate_limit(request: Request, call_next):
+    """Token bucket on mutating/compute endpoints (chat, what-if, approve,
+    dev-regenerate) — the paths that cost model work or write state."""
+    if request.method == "POST" and request.url.path.startswith("/api/"):
+        client = request.client.host if request.client else "unknown"
+        if not chat_limiter.allow(client):
+            audit.record({"kind": "rate_limited", "path": request.url.path,
+                          "client": client})
+            return JSONResponse({"detail": "rate limit exceeded — retry shortly"},
+                                status_code=429)
+    return await call_next(request)
 
 
 @app.middleware("http")
@@ -67,13 +82,13 @@ async def security_headers(request, call_next):
 
 
 class ChatIn(BaseModel):
-    message: str
+    message: str = Field(min_length=1, max_length=2000)
 
 
 class WhatIfIn(BaseModel):
-    sales_pct: float = 0
-    supplies_pct: float = 0
-    ar_delay_weeks: int = 0
+    sales_pct: float = Field(default=0, ge=-90, le=200)
+    supplies_pct: float = Field(default=0, ge=-90, le=200)
+    ar_delay_weeks: int = Field(default=0, ge=0, le=26)
     extra_outflow: dict | None = None
     extra_inflow: dict | None = None
 
