@@ -1,0 +1,12 @@
+# Devin environment blueprint for LedgerPilot
+initialize: |
+  sudo apt-get update -qq && sudo apt-get install -y --no-install-recommends libgomp1
+maintenance: |
+  python3 -m venv .venv && .venv/bin/pip install -r requirements.txt
+knowledge:
+  - name: test
+    contents: |
+      source .venv/bin/activate && python -m pytest -q
+  - name: startup
+    contents: |
+      .venv/bin/uvicorn app.main:app --port 8000  # UI at http://localhost:8000
