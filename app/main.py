@@ -4,7 +4,7 @@ from __future__ import annotations
 import math
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Request
+from fastapi import FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -174,7 +174,9 @@ def reject(action_id: str):
 
 
 @app.get("/api/transactions")
-def transactions(months: int = 3, category: str | None = None, q: str | None = None):
+def transactions(months: int = Query(3, ge=1, le=24),
+                 category: str | None = Query(None, max_length=80),
+                 q: str | None = Query(None, max_length=200)):
     out = call_tool(ctx, "load_transactions",
                     {"months": months, "category": category}, origin="api")
     if q:
@@ -195,7 +197,7 @@ def invoices():
 
 
 @app.get("/api/audit")
-def audit_tail(n: int = 60):
+def audit_tail(n: int = Query(60, ge=1, le=500)):
     return {"rows": audit.tail(n)}
 
 
