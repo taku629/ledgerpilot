@@ -11,7 +11,7 @@ from pydantic import BaseModel, Field
 
 from .agent import Agent
 from . import sandbox
-from .config import DATA_DIR, DISCLAIMER, LLM_BASE_URL, AUDIT_LOG
+from .config import DATA_DIR, DISCLAIMER, LLM_BASE_URL
 from .data_gen import generate, load_all
 from .security import (ApprovalError, ApprovalStore, AuditLog, RateLimiter,
                        scan_for_injection)
@@ -203,12 +203,16 @@ def audit_tail(n: int = Query(60, ge=1, le=500)):
 
 @app.post("/api/dev/regenerate")
 def regenerate():
-    for p in (sandbox.STATE_PATH, AUDIT_LOG):
-        try:
-            p.unlink(missing_ok=True)
-        except OSError:
-            pass
+    # Resets sandbox state + data files. The audit log is intentionally NOT
+    # deleted — the trail must survive a data reset; the regenerate itself
+    # is appended to it.
+    try:
+        sandbox.STATE_PATH.unlink(missing_ok=True)
+    except OSError:
+        pass
+    ctx.scheduled = sandbox.apply_reschedules(ctx.scheduled_raw)
     generate(out_dir=DATA_DIR)
+    audit.record({"kind": "data_regenerated"})
     return {"ok": True}
 
 
