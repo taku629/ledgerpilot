@@ -18,6 +18,11 @@ ranked action plan from live alerts + forecast, and each line names the next com
 | Sandbox execution, approval-gated | Ask to reschedule → approval card with live TTL countdown → Approve → forecast re-projects | `reschedule pay-012 to 2026-12-08` |
 | Operation log | Audit tab — color-coded, **"integrity verified — N events hash-chained"**, JSONL download | `show me the audit log` |
 | What-if | Sliders over the chart + chat scenarios | `increase prices 10 percent`, `what if my biggest customer pays late` |
+| Category cost shock | Per-payment delta × occurrences in the 13-wk window (frequency-aware) | `what happens if rent goes up 15%`, `what if payroll goes up 10%` |
+| Working-capital answer | DSO/DPO/DIO + open & overdue AR | `how fast do customers pay me` |
+| Seasonality answer | Monthly revenue profile from the ledger | `is my business seasonal` |
+| Break-even | Fixed costs ÷ gross margin vs actual revenue | `break even point` |
+| Safe discretionary spend | min projected balance − buffer | `how much can I safely spend` |
 
 ## Security & compliance (30%)
 
@@ -46,4 +51,4 @@ ranked action plan from live alerts + forecast, and each line names the next com
 - Backtest WAPE: model beats seasonal-naive in **4/4** categories; band coverage 75–87.5%
 - Overdue AR: INV-0014 Northwind Catering, $2,929, 25d
 - Week-7 committed cluster: $22,450 (rent + equipment + loan)
-- 69 pytest cases, all green
+- 80 pytest cases, all green

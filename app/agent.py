@@ -165,6 +165,71 @@ class DeterministicBackend:
             out = call("draft_loan_application", {"product_id": top["id"]})
             return self._reply(out, calls, injected_warn)
 
+        # ---- category cost change: "what if rent goes up 15%" ----
+        catq = re.search(
+            r"(rent|payroll|salary|staff|wages|loan|equipment|insurance|utilities|"
+            r"marketing|software|pos|repairs|maintenance|professional services|"
+            r"delivery|platform fees|tax)\b.*(up|increase|rais|higher|jump|spike)",
+            msg) or re.search(
+            r"(up|increase|rais|higher)\b.*"
+            r"(rent|payroll|salary|staff|wages|loan|equipment|insurance|utilities|"
+            r"marketing|software|pos|repairs|maintenance|professional services|"
+            r"delivery|platform fees|tax)", msg)
+        if catq:
+            words = {
+                "rent": "rent", "payroll": "payroll", "salary": "payroll",
+                "staff": "payroll", "wages": "payroll", "loan": "loan",
+                "equipment": "equipment", "insurance": "insurance",
+                "utilities": "utilities", "marketing": "marketing",
+                "software": "software", "pos": "software",
+                "repairs": "repairs", "maintenance": "repairs",
+                "professional": "professional", "delivery": "delivery",
+                "platform": "delivery", "tax": "tax"}
+            hit = next((w for w in words if re.search(rf"\b{w}", msg)), None)
+            rows = ctx.scheduled[ctx.scheduled.category.str.lower().str.contains(
+                words.get(hit, "__none__"), regex=False)] if hit else ctx.scheduled.iloc[:0]
+            if not rows.empty:
+                pct = abs(self._parse_pct(msg)) if re.search(
+                    r"\d+(?:\.\d+)?\s*(?:%|percent)", msg) else 0
+                fc0 = ctx.forecast()
+                horizon_end = pd.Timestamp(fc0["as_of"]) + pd.Timedelta(weeks=13)
+                step = {"weekly": pd.Timedelta(weeks=1),
+                        "biweekly": pd.Timedelta(weeks=2),
+                        "monthly": pd.DateOffset(months=1),
+                        "quarterly": pd.DateOffset(months=3)}
+                lines, total = [], 0.0
+                for _, r in rows.iterrows():
+                    nd, count = pd.Timestamp(r.next_date), 0
+                    while nd <= horizon_end:
+                        count += 1
+                        nd = nd + step.get(r.frequency,
+                                           pd.Timedelta(days=36500))
+                    if pct:
+                        delta = r.amount * pct / 100
+                        total += delta * count
+                        lines.append(
+                            f"- `{r.id}` {r.category} {_fmt(r.amount)} "
+                            f"({r.frequency}, next {r.next_date}): "
+                            f"+{pct:g}% = **+{_fmt(delta)} per payment** "
+                            f"× {count} in the 13-week window = +{_fmt(delta * count)}")
+                    else:
+                        lines.append(
+                            f"- `{r.id}` {r.category} {_fmt(r.amount)} "
+                            f"({r.frequency}, next {r.next_date}): "
+                            f"each +10% = +{_fmt(r.amount * 0.1)} per payment")
+                if pct:
+                    lines.append(f"\nIf the increase persists it adds "
+                                 f"**{_fmt(total)}** of extra outflow over the "
+                                 f"forecast window (baseline min balance "
+                                 f"{_fmt(fc0['min_balance'])} → "
+                                 f"{_fmt(fc0['min_balance'] - total)} before any "
+                                 f"mitigation).")
+                else:
+                    lines.append("Tell me the % and I'll compute the exact hit, "
+                                 "e.g. 'what if rent goes up 15%'.")
+                return self._reply({"text": "Cost increase impact:\n" + "\n".join(lines)},
+                                   calls, injected_warn)
+
         # ---- what-if ----
         wi = re.search(r"(what[- ]?if|if .* (drop|fall|decline|grow|rise|increase|decrease)|scenario)", msg) \
             or re.search(r"(increase|raise|cut|reduce|decrease|drop|grow|lift|lower)\b.*"
@@ -325,7 +390,8 @@ class DeterministicBackend:
             return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
 
         # ---- biggest expense ----
-        if re.search(r"(biggest|largest|top|main|most)\b.*(expense|cost|spend|vendor|supplier|outflow|payment)", msg):
+        if re.search(r"(biggest|largest|top|main|most)\b.*(expense|cost|spend|vendor|supplier|outflow|payment|pay\b)"
+                     r"|(who|whom).*(pay|owe)\b", msg):
             out = ctx.txn[ctx.txn.flow == "outflow"]
             total = out.amount.sum()
             bycat = out.groupby("category").amount.sum().sort_values(ascending=False)
@@ -337,6 +403,126 @@ class DeterministicBackend:
             lines += ["Top counterparties:"] + [
                 f"- {c}: {_fmt(v)}" for c, v in bycp.head(4).items()]
             return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- how fast do customers pay (DSO) ----
+        if re.search(r"(how (fast|quickly|long)|speed|long does it take)\b.*"
+                     r"(customer|client|pay|collect|invoice)|collection period", msg):
+            k = call("get_kpis")
+            wc = k["working_capital"]
+            lines = [f"**DSO {wc['dso']} days** — customers pay you on average "
+                     f"{wc['dso']} days after invoicing (90-day window).",
+                     f"Open receivables {_fmt(wc['open_receivables'])}, of which "
+                     f"{_fmt(wc['overdue_receivables'])} is overdue "
+                     f"({wc['overdue_count']} invoice(s))."]
+            if wc["overdue_invoices"]:
+                lines += [f"- `{o['id']}` {o['customer']} {_fmt(o['amount'])} "
+                          f"(due {o['due_date']})" for o in wc["overdue_invoices"]]
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn,
+                               data={"working_capital": wc})
+
+        # ---- seasonality ----
+        if re.search(r"(seasonal|seasonality|busiest|slow (month|season)|peak)", msg):
+            t = ctx.txn.copy()
+            t["m"] = pd.to_datetime(t["date"]).dt.month
+            t["ym"] = pd.to_datetime(t["date"]).dt.to_period("M")
+            # per-year-month totals first so months observed twice aren't double-counted
+            ym = t[t.flow == "inflow"].groupby("ym").amount.sum()
+            rev = ym.groupby(ym.index.month).mean()
+            names = {1: "Jan", 2: "Feb", 3: "Mar", 4: "Apr", 5: "May", 6: "Jun",
+                     7: "Jul", 8: "Aug", 9: "Sep", 10: "Oct", 11: "Nov", 12: "Dec"}
+            top = rev.sort_values(ascending=False).head(3)
+            bot = rev.sort_values().head(3)
+            ratio = top.mean() / bot.mean() if bot.mean() else float("nan")
+            txt = ("Yes — revenue is seasonal. Strongest months: "
+                   + ", ".join(f"{names[m]} {_fmt(v)}" for m, v in top.items())
+                   + ". Weakest: "
+                   + ", ".join(f"{names[m]} {_fmt(v)}" for m, v in bot.items())
+                   + f". Peak months run **~{ratio:.1f}x** the trough months, "
+                     "which is why the 13-week forecast uses a model with "
+                     "weekly seasonality terms rather than a flat average.")
+            return self._reply({"text": txt}, calls, injected_warn)
+
+        # ---- grants / subsidies ----
+        if re.search(r"(grant|subsidy|subsidie|government (fund|support|program))", msg):
+            out = call("match_financing")
+            isg = lambda r: re.search(r"grant|subsid", r["type"] + " " + r["name"], re.I)
+            grants = [r for r in out["ranked"] if isg(r)]
+            rej = [r for r in out["rejected"] if isg(r)]
+            if grants:
+                lines = ["Grant/subsidy options in the catalog, ranked by fit:"]
+                lines += [f"- **{g['name']}** — {g['type']}, up to "
+                          f"{_fmt(g['amount'])}, est. cost {_fmt(g['est_total_cost'])}, "
+                          f"funds in ~{g['time_to_fund_days']}d. {g['why']}"
+                          for g in grants]
+            else:
+                lines = []
+            if rej:
+                lines += ["Catalog grants that did NOT fit this specific gap:"]
+                lines += [f"- **{g['name']}** ({g['type']}) — "
+                          + "; ".join(g["reasons"]) for g in rej]
+                lines.append("They can still be worth pursuing for non-urgent "
+                             "needs — the scoring rejected them only because "
+                             "they fund too slowly for the week-2 gap.")
+            if not grants and not rej:
+                lines = ["No grant or subsidy products in the catalog at all — "
+                         "the ranked options are all repayable financing."]
+            elif not grants:
+                lines.insert(0, "No grant fits the urgent gap — the ranked "
+                                "options are all repayable financing.")
+            lines.append(out["disclaimer"])
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- break-even ----
+        if re.search(r"break.?even", msg):
+            k = call("get_kpis")
+            full = [m for m in k["monthly_pl"] if not m["partial"]]
+            m0 = full[-1]
+            be = m0["fixed_costs"] / max(m0["gross_margin_pct"], 1) * 100
+            margin = m0["revenue"] - be
+            txt = (f"Break-even revenue ≈ **{_fmt(be)}/month** "
+                   f"(fixed costs {_fmt(m0['fixed_costs'])} ÷ gross margin "
+                   f"{m0['gross_margin_pct']}%).\n"
+                   f"{m0['month']} actual revenue {_fmt(m0['revenue'])} → "
+                   f"{_fmt(abs(margin))} "
+                   f"{'above' if margin >= 0 else 'below'} break-even "
+                   f"({abs(margin) / be * 100:.0f}% {'cushion' if margin >= 0 else 'shortfall'}).")
+            return self._reply({"text": txt}, calls, injected_warn)
+
+        # ---- export ----
+        if re.search(r"(export|download|jsonl|csv|raw data|api access)", msg):
+            txt = ("Everything is exportable (all Tier-0 reads):\n"
+                   "- `GET /api/transactions` — categorized ledger (JSON)\n"
+                   "- `GET /api/forecast` — 13-week forecast + backtest\n"
+                   "- `GET /api/kpis` — P/L, working capital, drivers\n"
+                   "- `GET /api/financing/memo` — financing decision memo (markdown)\n"
+                   "- `GET /api/audit?format=jsonl` — hash-chained evidence log\n"
+                   "The Audit tab also has a one-click JSONL download.")
+            return self._reply({"text": txt}, calls, injected_warn)
+
+        # ---- cash position ----
+        if re.search(r"(how much cash|cash (on hand|position|do i have)|"
+                     r"current (cash )?balance|balance today)", msg):
+            fc0 = ctx.forecast()
+            txt = (f"**{_fmt(fc0['balance_start'])}** as of {fc0['as_of']}. "
+                   f"13-week projection bottoms at {_fmt(fc0['min_balance'])} "
+                   f"vs the {_fmt(fc0['cash_buffer'])} buffer.")
+            return self._reply({"text": txt}, calls, injected_warn)
+
+        # ---- safe discretionary spend ----
+        if re.search(r"(safe(ly)?|spare|discretionary|afford to)\b.*"
+                     r"(spend|pay out|outlay|invest)", msg):
+            fc0 = ctx.forecast()
+            headroom = fc0["min_balance"] - fc0["cash_buffer"]
+            if headroom >= 0:
+                txt = (f"About **{_fmt(headroom)}** — that's the lowest projected "
+                       f"balance ({_fmt(fc0['min_balance'])}) minus the "
+                       f"{_fmt(fc0['cash_buffer'])} buffer over 13 weeks.")
+            else:
+                txt = (f"**Effectively $0 right now** — the forecast already dips "
+                       f"{_fmt(-headroom)} below the {_fmt(fc0['cash_buffer'])} "
+                       f"buffer (week {fc0['gap_week']}). Cover the gap first "
+                       f"(ask me for financing options) before discretionary spend.")
+            return self._reply({"text": txt}, calls, injected_warn)
 
         # ---- cash-out timing ----
         if re.search(r"(run out|out of cash|go (negative|bust|bankrupt)|negative balance|below (the )?buffer|survive)", msg):

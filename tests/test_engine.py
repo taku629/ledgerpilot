@@ -293,3 +293,25 @@ def test_agent_judge_question_intents(ctx):
         r = _respond(ctx, q)
         assert needle in r["reply"], q
         assert "I can help with" not in r["reply"], q
+
+
+@pytest.mark.parametrize("q,needle", [
+    ("how fast do customers pay me", "DSO"),
+    ("is my business seasonal", "seasonal"),
+    ("are there any grants I qualify for", "Digitalization Grant"),
+    ("break even point", "Break-even"),
+    ("export my data", "/api/transactions"),
+    ("what happens if rent goes up 15%", "+$840 per payment"),
+    ("what if payroll goes up 10%", "pay-010"),
+    ("how much cash do I have", "$21,353"),
+    ("how much can I safely spend", "Effectively $0"),
+    ("who do I pay the most", "counterparties"),
+])
+def test_agent_second_wave_intents(ctx, q, needle):
+    assert needle in _respond(ctx, q)["reply"]
+
+
+def test_category_cost_change_respects_frequency(ctx):
+    r = _respond(ctx, "what if rent goes up 15%")["reply"]
+    # Rent is monthly: 3 payments inside the 13-week window
+    assert "× 3" in r and "+$2,520" in r
