@@ -62,6 +62,7 @@ def main():
         return out
 
     chat("Give me the 13-week cash flow forecast")
+    chat("What should I do first?")
     chat("Why did profit change? Run the KPI analysis")
     chat("What financing options cover the gap?")
     chat("Draft a payment reminder for the overdue invoice")
