@@ -29,7 +29,7 @@ ranked action plan from live alerts + forecast, and each line names the next com
 | Rubric item | Evidence |
 |---|---|
 | Permission tiers T0–T3 enforced server-side | `app/security.py` tier check per tool; T3 registered but disabled; `tests/test_security.py` |
-| Server-side execution gate | No approve tool exists for the model; single-use tokens, 300 s TTL (visible countdown), $50k cap, replay refused — all in `evidence/sandbox_op_log.jsonl` |
+| Server-side execution gate | No approve tool exists for the model; single-use tokens, 300 s TTL (visible countdown), $50k cap, replay refused — all in `evidence/sandbox_op_log.jsonl`. Typing `yes, approve it` in chat is refused too — approvals are clicks, not words (step in the demo scenario shows it) |
 | Prompt-injection defense | Live poisoned memo `txn-01150` flagged → `INJECTION_ATTEMPT` alert, never executed; user-channel jailbreak/extraction patterns flagged too |
 | PII masking | Transactions/Audit tabs; `mask_pii` applied before storage |
 | Auditability | `data/audit_log.jsonl` — append-only, **hash-chained**; `GET /api/audit/verify` re-checks the chain (tamper test: `test_audit_chain_tamper_evidence`) |

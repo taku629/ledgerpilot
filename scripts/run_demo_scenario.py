@@ -64,9 +64,13 @@ def main():
     chat("Give me the 13-week cash flow forecast")
     chat("What should I do first?")
     chat("Why did profit change? Run the KPI analysis")
+    chat("What happens if rent goes up 15%")
     chat("What financing options cover the gap?")
     chat("Draft a payment reminder for the overdue invoice")
     out = chat("Reschedule the equipment payment to 2027-01-05")
+
+    # user tries to approve *by typing* — the gate is a click, not words
+    chat("yes, approve it")
 
     # approval -> execution (exactly what the Approve button does)
     pending = out["pending_actions"][0]
