@@ -181,3 +181,12 @@ def test_healthz_reports_integrity():
     d = r.json()
     assert d["ok"] and d["audit_integrity_ok"] is True
     assert d["transactions"] > 0 and d["as_of"]
+
+
+def test_scheduled_endpoint():
+    r = client.get("/api/scheduled")
+    assert r.status_code == 200
+    rows = r.json()["rows"]
+    assert len(rows) == 13
+    assert all("days_until" in x for x in rows)
+    assert rows[0]["next_date"] <= rows[-1]["next_date"]

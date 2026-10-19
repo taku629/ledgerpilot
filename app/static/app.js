@@ -273,6 +273,16 @@ async function renderAudit() {
     || "<div class='auditRow'>No events yet.</div>");
 }
 
+/* ---------------- Scheduled payments ---------------- */
+async function renderScheduled() {
+  const s = await api("/api/scheduled");
+  $("#schedTable").innerHTML = `<table><tr><th>ID</th><th>Category</th><th>Counterparty</th><th>Amount</th><th>Frequency</th><th>Next due</th><th>In</th></tr>` +
+    s.rows.map(r => `<tr><td><code>${r.id}</code></td><td>${esc(r.category)}</td>
+      <td>${esc(r.counterparty)}</td><td class="neg">${fmt(r.amount)}</td>
+      <td>${esc(r.frequency)}</td><td>${r.next_date}</td>
+      <td>${r.days_until}d</td></tr>`).join("") + "</table>";
+}
+
 /* ---------------- Transactions ---------------- */
 async function renderTxns() {
   const months = +$("#txnMonths").value, q = $("#txnFilter").value;
@@ -405,7 +415,7 @@ $("#txnFilter").oninput = () => renderTxns();
 
 async function refresh() {
   STATE = await api("/api/state");
-  renderKpis(); renderChart(); renderAlerts(); renderAnalysis();
+  renderKpis(); renderChart(); renderAlerts(); renderAnalysis(); renderScheduled();
 }
 
 (async function init() {

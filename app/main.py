@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 from .agent import Agent
 from . import sandbox
-from .config import DATA_DIR, DISCLAIMER, LLM_BASE_URL
+from .config import DATA_DATE, DATA_DIR, DISCLAIMER, LLM_BASE_URL
 from .data_gen import generate, load_all
 from .security import (ApprovalError, ApprovalStore, AuditLog, RateLimiter,
                        scan_for_injection)
@@ -236,6 +236,17 @@ def json_dump(o):
 @app.get("/api/invoices")
 def invoices():
     return {"rows": ctx.invoices.to_dict("records")}
+
+
+@app.get("/api/scheduled")
+def scheduled():
+    import pandas as pd
+    today = pd.Timestamp(DATA_DATE or pd.Timestamp.today().date())
+    rows = ctx.scheduled.to_dict("records")
+    for r in rows:
+        r["days_until"] = (pd.Timestamp(r["next_date"]) - today).days
+    return {"rows": sorted(rows, key=lambda r: r["next_date"]),
+            "as_of": str(today.date())}
 
 
 @app.get("/api/audit")
