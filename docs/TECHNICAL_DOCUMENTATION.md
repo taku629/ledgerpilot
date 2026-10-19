@@ -191,7 +191,7 @@ All synthetic, generated deterministically by `app/data_gen.py`
 | `POST /api/actions/{id}/reject` | reject proposal | T2 gate |
 | `GET /api/transactions?months=&category=&q=` | sanitized rows | T0 |
 | `GET /api/invoices` | invoice ledger | T0 |
-| `GET /api/audit?n=` | audit log tail | T0 |
+| `GET /api/audit?n=&format=` | audit log tail (json or jsonl download) | T0 |
 | `POST /api/dev/regenerate` | regenerate synthetic data (audit log preserved) | dev |
 | `GET /healthz` | liveness | — |
 
