@@ -110,6 +110,11 @@ JAILBREAK_PATTERNS = [
     r"\bcall\s+(execute|approve|run)_",
     r"as an ai,? (you|i) (must|should|will)",
     r"override (the )?(approval|permission|security)",
+    # prompt-extraction and persona-shift attempts
+    r"(reveal|show|print|repeat|leak|output) (me )?(your|the) (system|initial|original|hidden) "
+    r"(prompt|instructions?|rules?|message)",
+    r"(do anything now|developer mode|jailbreak|\bDAN\b mode)",
+    r"forget (everything|all) (you|that)",
 ]
 # Agent-directed imperatives: suspicious ONLY inside data fields — a user is
 # allowed to type "wire $5,000", a transaction memo is not allowed to say it.
