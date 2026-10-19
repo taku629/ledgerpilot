@@ -270,3 +270,19 @@ def test_number_guard_passes_correct_numbers():
     outputs = [{"min_balance": 16678.0, "balance_start": 21353.0}]
     guard = agent.number_guard(reply, outputs)
     assert guard["unverified"] == []
+
+
+def test_agent_judge_question_intents(ctx):
+    """Judge-style questions must hit a real intent, not the help fallback."""
+    checks = [
+        ("which customer owes me the most", "receivables"),
+        ("what is my biggest expense", "Outflow"),
+        ("when will I run out of cash", "buffer"),
+        ("what is my burn rate", "/week"),
+        ("can I afford a $4,000/month hire", "buffer"),
+        ("compare this month to last", "| Metric |"),
+    ]
+    for q, needle in checks:
+        r = _respond(ctx, q)
+        assert needle in r["reply"], q
+        assert "I can help with" not in r["reply"], q

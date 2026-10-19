@@ -19,6 +19,7 @@ import re
 from datetime import date, timedelta
 
 import httpx
+import pandas as pd
 
 from . import tools as tools_mod
 from .config import (DATA_DATE, DISCLAIMER, LLM_API_KEY, LLM_BASE_URL, LLM_MODEL)
@@ -273,6 +274,128 @@ class DeterministicBackend:
                 f"- [{a['severity'].upper()}] {a['title']}" for a in al["alerts"][:8]]
             return self._reply({"text": "\n".join(lines)}, calls, injected_warn,
                                data={"alerts": al["alerts"]})
+
+        # ---- receivables: who owes me ----
+        if re.search(r"(owed|owes|owe me|receivable|unpaid|overdue|open invoice|collect)", msg):
+            inv = ctx.invoices.copy()
+            open_ = inv[inv.status != "paid"].copy()
+            today = pd.Timestamp(DATA_DATE or date.today())
+            open_["days_overdue"] = (today - pd.to_datetime(open_.due_date)).dt.days
+            over = open_[open_.days_overdue > 0].sort_values(
+                "days_overdue", ascending=False)
+            lines = [f"Open receivables: **{_fmt(open_.amount.sum())}** across "
+                     f"{len(open_)} invoices — **{_fmt(over.amount.sum())} overdue**."]
+            lines += [f"- `{r.id}` {r.customer}: {_fmt(r.amount)} due {r.due_date}"
+                      f" — **{r.days_overdue}d overdue**"
+                      for r in over.head(6).itertuples()]
+            nxt = open_[open_.days_overdue <= 0].sort_values("due_date").head(3)
+            if len(nxt):
+                lines += ["Next due:"] + [
+                    f"- `{r.id}` {r.customer}: {_fmt(r.amount)} due {r.due_date}"
+                    for r in nxt.itertuples()]
+            lines.append("Say `draft a payment reminder for INV-0001` to collect.")
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- biggest expense ----
+        if re.search(r"(biggest|largest|top|main|most)\b.*(expense|cost|spend|vendor|supplier|outflow|payment)", msg):
+            out = ctx.txn[ctx.txn.flow == "outflow"]
+            total = out.amount.sum()
+            bycat = out.groupby("category").amount.sum().sort_values(ascending=False)
+            bycp = out.groupby("counterparty").amount.sum().sort_values(ascending=False)
+            span = f"{out.date.min().date()} → {out.date.max().date()}"
+            lines = [f"Outflow {span} — top categories:"] + [
+                f"- {c}: {_fmt(v)} ({v / total * 100:.0f}%)"
+                for c, v in bycat.head(6).items()]
+            lines += ["Top counterparties:"] + [
+                f"- {c}: {_fmt(v)}" for c, v in bycp.head(4).items()]
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- cash-out timing ----
+        if re.search(r"(run out|out of cash|go (negative|bust|bankrupt)|negative balance|below (the )?buffer|survive)", msg):
+            fc = call("get_cashflow_forecast")
+            buf = ctx.profile["cash_buffer"]
+            neg = next((w for w in fc["weeks"] if w["balance_p50"] < 0), None)
+            br = next((w for w in fc["weeks"] if w["balance_p50"] < buf), None)
+            worst = min(fc["weeks"], key=lambda w: w["balance_p50"])
+            if neg:
+                lines = [f"At P50 you go **negative in week {neg['week']}** "
+                         f"({neg['start']}): {_fmt(neg['balance_p50'])}."]
+            elif br:
+                lines = [f"You don't hit zero, but you breach the "
+                         f"**{_fmt(buf)} buffer in week {br['week']}** "
+                         f"({br['start']}): {_fmt(br['balance_p50'])}."]
+            else:
+                lines = ["You stay above the buffer for all 13 weeks at P50."]
+            lines.append(f"Worst point: **{_fmt(worst['balance_p50'])}** in week "
+                         f"{worst['week']} ({worst['start']}); P10 scenario "
+                         f"{_fmt(worst['balance_p10'])}.")
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- burn rate ----
+        if re.search(r"(burn rate|burning|net (spend|burn|outflow))", msg):
+            t = ctx.txn.copy()
+            t["wk"] = pd.to_datetime(t.date).dt.to_period("W")
+            g = t.pivot_table(index="wk", columns="flow",
+                              values="amount", aggfunc="sum", fill_value=0)
+            g["net"] = g.get("inflow", 0) - g.get("outflow", 0)
+            recent = g.tail(8)
+            wk_net = float(recent["net"].mean())
+            wk_out = float(recent["outflow"].mean())
+            if wk_net < 0:
+                lines = [f"You're burning **{_fmt(-wk_net)}/week** on average "
+                         f"over the last 8 weeks (gross outflow {_fmt(wk_out)}/wk)."]
+            else:
+                lines = [f"Net **+{_fmt(wk_net)}/week** over the last 8 weeks — "
+                         f"you're cash-generative right now "
+                         f"(gross outflow {_fmt(wk_out)}/wk)."]
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- affordability check ----
+        if re.search(r"(afford|hire|headcount|new (employee|hire))", msg):
+            fc = call("get_cashflow_forecast")
+            buf = ctx.profile["cash_buffer"]
+            worst = min(fc["weeks"], key=lambda w: w["balance_p50"])
+            m = re.search(r"\$\s?([\d,]+)", msg)
+            if m:
+                amt = float(m.group(1).replace(",", ""))
+                per_wk = amt / 4.33 if re.search(r"month|/mo\b", msg) else amt
+                new_min = worst["balance_p50"] - per_wk * worst["week"]
+                verdict = ("stays above the buffer" if new_min >= buf else
+                           f"drops you to {_fmt(new_min)} by week {worst['week']} "
+                           f"(buffer {_fmt(buf)}) — **not yet safe**")
+                lines = [f"A recurring {_fmt(per_wk)}/week ({_fmt(amt)}) {verdict}.",
+                         f"Current worst point without it: {_fmt(worst['balance_p50'])} "
+                         f"in week {worst['week']}."]
+            else:
+                headroom = worst["balance_p50"] - buf
+                lines = [f"Worst projected point **{_fmt(worst['balance_p50'])}** "
+                         f"(week {worst['week']}) vs {_fmt(buf)} buffer → "
+                         f"{'headroom of ' + _fmt(headroom) if headroom > 0 else 'a shortfall of ' + _fmt(-headroom)}.",
+                         "Cover the gap first (see financing options) before "
+                         "adding recurring cost." if headroom < 0 else
+                         "Tell me the recurring cost (e.g. \"$4,000/month hire\") "
+                         "and I'll test it against the forecast."]
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- month-over-month ----
+        if re.search(r"(compare|versus|month.?over.?month|vs last month|mom)", msg):
+            k = call("get_kpis")
+            full = [m2 for m2 in k["monthly_pl"] if not m2.get("partial")]
+            if len(full) >= 2:
+                a, b = full[-2], full[-1]
+                rows = [("revenue", "revenue"), ("gross margin", "gross_margin_pct"),
+                        ("fixed costs", "fixed_costs"), ("net cashflow", "net_cashflow")]
+                lines = [f"| Metric | {a['month']} | {b['month']} | Δ |",
+                         "|---|--:|--:|--:|"]
+                for label, key in rows:
+                    va, vb = a[key], b[key]
+                    dv = vb - va
+                    unit = "%" if "pct" in key else "$"
+                    sv = f"{va}%" if unit == "%" else _fmt(va)
+                    tv = f"{vb}%" if unit == "%" else _fmt(vb)
+                    lines.append(f"| {label} | {sv} | {tv} | "
+                                 f"{'+' if dv >= 0 else ''}{dv:,.1f}{'%' if unit == '%' else ''} |")
+                return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
 
         if re.search(r"(transaction|history|recent|spend|expense list)", msg):
             t = call("load_transactions", {"months": 1})
