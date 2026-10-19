@@ -28,7 +28,7 @@ datasets, no credentials in the repo.
 | **Sandbox execution** | Reschedule payments, record simulated payments, change the alert threshold, draft dunning emails and loan applications. **Tier-2 actions only run after the owner clicks Approve** — and are written to the JSONL audit log. |
 | **What-if** | "Sales −20%?", "supplies +15%?", "receivables 2 weeks late?" — instant recompute on the dashboard sliders or in chat. |
 | **Evidence drilldown** | Every alert and every forecast point jumps to the underlying rows (invoices, committed payments, flagged records) — and the rows act back: *Move +1w* proposes a reschedule, *Draft reminder* writes the collection email. |
-| **Model accountability** | A walk-forward backtest (WAPE per category, model vs seasonal-naive) is folded under the chart — accuracy claims are inspectable, not asserted. |
+| **Model accountability** | A walk-forward backtest (WAPE per category, model vs seasonal-naive, plus measured P10–P90 band coverage) is folded under the chart — accuracy claims are inspectable, not asserted. |
 | **Deterministic narrative** | The "what changed" explanation in the Analysis tab is assembled in code from the same table rows — it can never disagree with the numbers. |
 
 ## Security model (summary)
@@ -48,6 +48,8 @@ datasets, no credentials in the repo.
 - **Edge hardening:** strict self-only CSP (Chart.js vendored — zero external
   requests), `nosniff`/`DENY`/`no-referrer` headers, per-IP rate limit on
   POST endpoints (429 + audit event), and bounded inputs on every endpoint.
+- **Exportable evidence:** the append-only audit log (survives data resets)
+  is downloadable as JSONL from the Audit tab or `GET /api/audit?format=jsonl`.
 - Full write-up: [`docs/SECURITY_SELF_ASSESSMENT.md`](docs/SECURITY_SELF_ASSESSMENT.md)
 
 ## Quick start

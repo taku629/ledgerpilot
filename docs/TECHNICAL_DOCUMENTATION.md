@@ -69,8 +69,11 @@ enforces, and the owner approves**.
    rmean4, rmean8, rstd8, month, wom, woy`. The model is a recursive
    LightGBM regressor (predict week t+1, feed it back as lag features).
    Fallbacks: seasonal moving average → level, chosen by history depth.
-3. **Uncertainty band** — holdout residuals are quantiled per category;
-   P10/P90 propagate to the balance projection.
+3. **Uncertainty band** — holdout residual quantiles per category give an
+   *asymmetric* interval `pred + [q10, q90]` (captures holdout bias and skew);
+   the lo/hi offsets propagate to the balance P10/P90. The fold reports the
+   band's measured **coverage** — the share of held-out weeks whose actuals
+   landed inside it (demo: 75–87.5% vs an 80% ideal; 8-week granularity).
 4. **Committed payments** — the scheduled-payment calendar (rent, payroll,
    loan, tax, equipment …) is expanded onto the same week grid and added as
    *certain* outflow — these are obligations, not predictions.

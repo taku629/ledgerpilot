@@ -30,7 +30,10 @@ synthetic data".*
 
 > "Every modeled category is backtested against a seasonal-naive
 > baseline — the table right under the chart shows the model's WAPE
-> beating the baseline on each one. The LLM never predicts a number."
+> beating the baseline on each one, plus the measured coverage of the
+> uncertainty band: we report how often held-out weeks actually landed
+> inside the predicted interval — around the 80% it should be.
+> The LLM never predicts a number."
 
 **Do:** Click a low point on the curve → evidence modal. Click **Move +1w**
 on a committed row — the chat proposes a reschedule (don't approve it).
