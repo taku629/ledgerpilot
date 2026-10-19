@@ -171,14 +171,14 @@ class DeterministicBackend:
                          r"(price|prices|sales|revenue|cost|supplies|expense)", msg) \
             or re.search(r"(price|sales|revenue|cost)s?\b.*(up|down|rise|higher|lower)", msg)
         if wi:
-            pct = self._parse_pct(msg)
+            pct = max(-90.0, min(200.0, self._parse_pct(msg)))
             args = {"sales_pct": pct}
             if "supplier" in msg or "supplies" in msg or "cost" in msg or "expense" in msg:
                 args = {"supplies_pct": pct}
                 if "sales" in msg:
                     args["sales_pct"] = pct
             if "receiv" in msg or "collect" in msg or "late" in msg:
-                args = {"ar_delay_weeks": max(1, int(abs(pct) / 10)) or 2}
+                args = {"ar_delay_weeks": min(26, max(1, int(abs(pct) / 10)) or 2)}
             out = call("what_if", args)
             base = ctx.forecast()
             txt = (f"What-if ({', '.join(f'{k}={v}' for k, v in args.items())}):\n"
@@ -565,7 +565,7 @@ class DeterministicBackend:
                     pid = r.id
                     break
         d = None
-        m2 = re.search(r"(20\d\d[-/]\d\d?[-/]\d\d?)", message)
+        m2 = re.search(r"(\d{4}[-/]\d\d?[-/]\d\d?)", message)
         if m2:
             d = m2.group(1).replace("/", "-")
         else:

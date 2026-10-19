@@ -8,11 +8,12 @@ from __future__ import annotations
 
 import json
 import time
+from datetime import date
 from pathlib import Path
 
 import pandas as pd
 
-from .config import DATA_DIR
+from .config import DATA_DATE, DATA_DIR
 from .security import mask_pii
 
 STATE_PATH = DATA_DIR / "sandbox_state.json"
@@ -43,16 +44,30 @@ def apply_reschedules(sched: pd.DataFrame) -> pd.DataFrame:
 
 
 # ------------------------------------------------------------ Tier-2 actions
+def validate_reschedule_date(new_date: str) -> str | None:
+    """Returns an error string when a reschedule target is out of range,
+    else None — shared by the proposal path and the executor."""
+    try:
+        nd = pd.Timestamp(new_date)
+    except Exception:
+        return f"invalid date {new_date}"
+    today = pd.Timestamp(DATA_DATE or date.today())
+    if nd.date() < today.date():
+        return f"{new_date} is in the past — pick a future date"
+    if nd > today + pd.Timedelta(weeks=104):
+        return f"{new_date} is over 2 years out — pick a nearer date"
+    return None
+
+
 def exec_reschedule_payment(sched: pd.DataFrame, payment_id: str,
                             new_date: str) -> dict:
     row = sched[sched.id == payment_id]
     if row.empty:
         return {"ok": False, "error": f"unknown payment_id {payment_id}"}
     old = row.iloc[0].next_date
-    try:
-        pd.Timestamp(new_date)
-    except Exception:
-        return {"ok": False, "error": f"invalid date {new_date}"}
+    err = validate_reschedule_date(new_date)
+    if err:
+        return {"ok": False, "error": err}
     if str(old) == new_date:
         return {"ok": False,
                 "error": f"{payment_id} is already scheduled on {new_date}"}

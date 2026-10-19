@@ -212,15 +212,20 @@ def forecast_cashflow(txn: pd.DataFrame, sched: pd.DataFrame, profile: dict,
     extra_outflow {amount, week, label}, extra_inflow {amount, week, label}.
     """
     whatif = whatif or {}
+    # Engine-level bounds — the API clamps too, but tools/agent paths must not
+    # be able to push the model into nonsense multipliers (e.g. -500% sales).
+    def _pct(key):
+        return float(np.clip(float(whatif.get(key, 0) or 0), -90.0, 200.0))
+
     end = end or txn.date.max().date()
     wk = weekly_series(txn, end)
     week0_start = pd.Timestamp(end) - pd.Timedelta(days=6)
     hist_start_weeks = min(26, wk.shape[0])
 
     sales_cats = {"POS Sales", "Online Sales", "Wholesale Invoice"}
-    sales_mult = 1.0 + float(whatif.get("sales_pct", 0)) / 100
-    sup_mult = 1.0 + float(whatif.get("supplies_pct", 0)) / 100
-    ar_delay = int(whatif.get("ar_delay_weeks", 0))
+    sales_mult = 1.0 + _pct("sales_pct") / 100
+    sup_mult = 1.0 + _pct("supplies_pct") / 100
+    ar_delay = int(np.clip(int(whatif.get("ar_delay_weeks", 0) or 0), 0, 26))
 
     modeled, backtests = [], {}
     for flow, cats in (("inflow", MODELED_INFLOW), ("outflow", MODELED_OUTFLOW)):
@@ -246,8 +251,14 @@ def forecast_cashflow(txn: pd.DataFrame, sched: pd.DataFrame, profile: dict,
     sched_by_week = sched_rows.groupby("week").amount.sum().to_dict() \
         if len(sched_rows) else {}
 
-    extra_out = whatif.get("extra_outflow") or {}
-    extra_in = whatif.get("extra_inflow") or {}
+    def _bounded_extra(key):
+        e = whatif.get(key) or {}
+        return {"week": int(np.clip(int(e.get("week") or 0), 1, weeks)),
+                "amount": float(np.clip(float(e.get("amount") or 0), 0, 1e7)),
+                "label": str(e.get("label") or "")[:80]}
+
+    extra_out = _bounded_extra("extra_outflow") if whatif.get("extra_outflow") else {}
+    extra_in = _bounded_extra("extra_inflow") if whatif.get("extra_inflow") else {}
 
     out_weeks, balance = [], float(profile["current_balance"])
     for w in range(1, weeks + 1):

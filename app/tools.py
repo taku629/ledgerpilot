@@ -206,11 +206,12 @@ def call_tool(ctx: BusinessContext, name: str, args: dict,
             if row.empty:
                 return {"error": f"unknown payment_id {a.get('payment_id')}",
                         "denied": True}
-            try:
-                pd.Timestamp(a.get("new_date"))
-            except Exception:
-                return {"error": f"invalid date {a.get('new_date')}",
-                        "denied": True}
+            err = sandbox.validate_reschedule_date(a.get("new_date"))
+            if err:
+                ctx.audit.record({"kind": "tool_denied", "tool": name,
+                                  "args": mask_pii(args), "reason": err,
+                                  "origin": origin})
+                return {"error": err, "denied": True}
             if str(row.iloc[0].next_date) == str(a.get("new_date")):
                 ctx.audit.record({"kind": "tool_denied", "tool": name,
                                   "args": mask_pii(args),

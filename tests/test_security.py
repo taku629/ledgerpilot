@@ -227,3 +227,26 @@ def test_audit_chain_tamper_evidence(tmp_path):
     log.path.write_text("\n".join(lines) + "\n")
     v2 = log.verify()
     assert not v2["ok"] and v2["first_broken_index"] == 1
+
+
+def test_reschedule_past_and_far_future_rejected(ctx):
+    from app import sandbox as sb
+    assert sb.exec_reschedule_payment(
+        ctx.scheduled, "pay-012", "1999-01-01")["ok"] is False
+    assert "past" in sb.exec_reschedule_payment(
+        ctx.scheduled, "pay-012", "1999-01-01")["error"]
+    assert "2 years" in sb.exec_reschedule_payment(
+        ctx.scheduled, "pay-012", "2099-01-01")["error"]
+
+
+def test_whatif_params_clamped_at_engine(ctx):
+    from app import forecasting as fc
+    import pandas as pd
+    out = fc.forecast_cashflow(ctx.txn, ctx.scheduled, ctx.profile,
+                               whatif={"sales_pct": -500})
+    # -500% is clamped to -90%: min balance is bad but not -$800k nonsense
+    assert out["min_balance"] > -200000
+    out2 = fc.forecast_cashflow(ctx.txn, ctx.scheduled, ctx.profile,
+                                whatif={"extra_outflow": {"week": 99,
+                                                          "amount": 1e12}})
+    assert out2["weeks"][0]["outflow_committed"] <= 1e7
