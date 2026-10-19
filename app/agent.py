@@ -171,7 +171,8 @@ class DeterministicBackend:
                          r"(price|prices|sales|revenue|cost|supplies|expense)", msg) \
             or re.search(r"(price|sales|revenue|cost)s?\b.*(up|down|rise|higher|lower)", msg)
         if wi:
-            pct = max(-90.0, min(200.0, self._parse_pct(msg)))
+            raw_pct = self._parse_pct(msg)
+            pct = max(-90.0, min(200.0, raw_pct))
             args = {"sales_pct": pct}
             if "supplier" in msg or "supplies" in msg or "cost" in msg or "expense" in msg:
                 args = {"supplies_pct": pct}
@@ -181,7 +182,8 @@ class DeterministicBackend:
                 args = {"ar_delay_weeks": min(26, max(1, int(abs(pct) / 10)) or 2)}
             out = call("what_if", args)
             base = ctx.forecast()
-            txt = (f"What-if ({', '.join(f'{k}={v}' for k, v in args.items())}):\n"
+            txt = (f"What-if ({', '.join(f'{k}={v}' for k, v in args.items())}"
+                   f"{f' — clamped from {raw_pct:+.0f}%' if pct != raw_pct else ''}):\n"
                    f"- Minimum projected balance: {_fmt(out['min_balance'])} "
                    f"(baseline {_fmt(base['min_balance'])})\n"
                    f"- First week below buffer: "
