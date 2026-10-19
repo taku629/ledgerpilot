@@ -255,9 +255,16 @@ function auditKindClass(k) {
 
 async function renderAudit() {
   const a = await api("/api/audit?n=60");
+  let badge = "";
+  try {
+    const v = await api("/api/audit/verify");
+    badge = v.ok
+      ? `<b style="color:var(--accent)">integrity verified</b> — ${v.events} events hash-chained`
+      : `<b class="neg">chain broken at event ${v.first_broken_index}</b>`;
+  } catch (e) { badge = ""; }
   $("#auditList").innerHTML =
     `<div class="fineprint" style="padding:0 0 8px">${a.rows.length} events —
-     append-only; survives data reset.
+     append-only; survives data reset. ${badge}.
      <a href="/api/audit?format=jsonl&n=500" download="ledgerpilot_audit.jsonl">Download evidence (JSONL)</a></div>` +
     (a.rows.map(e =>
     `<div class="auditRow"><span class="ts">${e.ts || ""}</span>

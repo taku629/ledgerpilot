@@ -154,6 +154,10 @@ report. The five layers:
    memo so judges can watch it fail to execute.
 4. **Audit** — every tool call, denial, proposal, execution and what-if is
    appended to `data/audit_log.jsonl` with PII masking applied first.
+   Each line carries `chain = sha256(prev_chain | event)`, so editing or
+   deleting any earlier line provably breaks every later hash —
+   `GET /api/audit/verify` re-checks the chain and the UI shows a
+   "integrity verified" badge.
 5. **Transport & input hardening** — every response carries CSP
    `default-src 'self'` (all assets incl. vendored Chart.js are
    same-origin), `nosniff`, `X-Frame-Options: DENY`, `Referrer-Policy`,

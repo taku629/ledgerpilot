@@ -208,3 +208,22 @@ def test_reschedule_to_same_date_rejected(ctx):
                                           str(row.next_date))
     assert res["ok"] is False
     assert "already scheduled" in res["error"]
+
+
+def test_audit_chain_tamper_evidence(tmp_path):
+    """Append-only log is hash-chained: rewriting a past line must break
+    verification at exactly that index."""
+    from app.security import AuditLog
+    import json as _json
+    log = AuditLog(tmp_path / "audit.jsonl")
+    for i in range(4):
+        log.record({"kind": "test", "i": i})
+    v = log.verify()
+    assert v["ok"] and v["events"] == 4
+
+    lines = log.path.read_text().splitlines()
+    ev = _json.loads(lines[1]); ev["i"] = 999
+    lines[1] = _json.dumps(ev)
+    log.path.write_text("\n".join(lines) + "\n")
+    v2 = log.verify()
+    assert not v2["ok"] and v2["first_broken_index"] == 1

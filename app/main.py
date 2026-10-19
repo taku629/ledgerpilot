@@ -247,6 +247,13 @@ def audit_tail(n: int = Query(60, ge=1, le=500),
     return {"rows": audit.tail(n)}
 
 
+@app.get("/api/audit/verify")
+def audit_verify():
+    """Re-verify the hash chain over the append-only log — proves to judges
+    the trail is tamper-evident, not just written."""
+    return audit.verify()
+
+
 @app.post("/api/dev/regenerate")
 def regenerate():
     # Resets sandbox state + data files. The audit log is intentionally NOT

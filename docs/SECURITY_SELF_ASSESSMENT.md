@@ -67,7 +67,11 @@ acct 8841-XX"*).
    output can mint an approval token. Verified by
    `test_poisoned_memo_never_executes`.
 4. **Auditability** — flagged inputs are recorded
-   (`user_input_flagged`, `tool_denied` events).
+   (`user_input_flagged`, `tool_denied` events). The log is
+   **hash-chained** (`chain = sha256(prev|event)` per line): tampering
+   with any earlier line is provably detectable via
+   `GET /api/audit/verify`, verified by
+   `test_audit_chain_tamper_evidence`.
 
 Patterns: `app/security.py::JAILBREAK_PATTERNS` (both channels — includes
 prompt-extraction like "reveal your system prompt" and persona-shift like

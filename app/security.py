@@ -56,9 +56,47 @@ class AuditLog:
         event.setdefault("event_id", "evt-" + uuid.uuid4().hex[:10])
         event = json.loads(json.dumps(mask_pii(event)))
         with self._lock:
+            event["chain"] = self._next_chain(event)
             with self.path.open("a") as f:
                 f.write(json.dumps(event) + "\n")
         return event
+
+    def _next_chain(self, event: dict) -> str:
+        """sha256(prev_chain | canonical(event)) — makes the log tamper-evident:
+        deleting or editing any earlier line breaks every later hash."""
+        prev = "GENESIS"
+        if self.path.exists():
+            lines = self.path.read_text().strip().splitlines()
+            if lines:
+                try:
+                    prev = json.loads(lines[-1]).get("chain", "GENESIS")
+                except json.JSONDecodeError:
+                    prev = "GENESIS"
+        body = json.dumps(event, sort_keys=True)
+        return hashlib.sha256((prev + "|" + body).encode()).hexdigest()[:16]
+
+    def verify(self) -> dict:
+        """Re-verify the whole chain. Returns event count and first broken
+        index, if any — used by /api/audit/verify and the UI badge."""
+        if not self.path.exists():
+            return {"ok": True, "events": 0}
+        prev, events, bad = "GENESIS", 0, None
+        for i, ln in enumerate(self.path.read_text().strip().splitlines()):
+            try:
+                e = json.loads(ln)
+            except json.JSONDecodeError:
+                bad = bad if bad is not None else i
+                continue
+            body = {k: v for k, v in e.items() if k != "chain"}
+            expect = hashlib.sha256(
+                (prev + "|" + json.dumps(body, sort_keys=True)).encode()
+            ).hexdigest()[:16]
+            if e.get("chain") != expect and bad is None:
+                bad = i
+            prev = e.get("chain", prev)
+            events += 1
+        return {"ok": bad is None, "events": events,
+                "first_broken_index": bad}
 
     def tail(self, n: int = 50) -> list[dict]:
         if not self.path.exists():
