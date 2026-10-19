@@ -4,11 +4,30 @@ const fmt = (v, d = 0) => v == null ? "—" :
   (v < 0 ? "-$" : "$") + Math.abs(v).toLocaleString(undefined, {maximumFractionDigits: d});
 const esc = (s) => String(s ?? "").replace(/[&<>"]/g, c =>
   ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
-const md = (s) => esc(s)
-  .replace(/\*\*(.+?)\*\*/g, "<b>$1</b>")
-  .replace(/```([\s\S]*?)```/g, '<pre style="background:#0d1420;padding:10px;border-radius:8px;overflow:auto;font-size:11px">$1</pre>')
-  .replace(/`([^`]+)`/g, "<code>$1</code>")
-  .replace(/\n/g, "<br>");
+const md = (s) => {
+  const safe = esc(s);
+  const lines = safe.split("\n");
+  let out = [], tbl = [];
+  const flush = () => {
+    if (tbl.length < 2) { out.push(...tbl); tbl = []; return; }
+    const rows = tbl.filter(l => !/^\|[\s\-|:]+\|$/.test(l.trim()));
+    const cells = l => l.trim().replace(/^\||\|$/g, "").split("|").map(c => c.trim());
+    const [head, ...body] = rows;
+    out.push(`<table class="mdTbl"><tr>${cells(head).map(c => `<th>${c}</th>`).join("")}</tr>` +
+      body.map(r => `<tr>${cells(r).map(c => `<td>${c}</td>`).join("")}</tr>`).join("") + "</table>");
+    tbl = [];
+  };
+  for (const l of lines) {
+    if (l.trim().startsWith("|")) { tbl.push(l); continue; }
+    flush();
+    out.push(l);
+  }
+  flush();
+  return out.join("<br>")
+    .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>")
+    .replace(/```([\s\S]*?)```/g, '<pre style="background:#0d1420;padding:10px;border-radius:8px;overflow:auto;font-size:11px">$1</pre>')
+    .replace(/`([^`]+)`/g, "<code>$1</code>");
+};
 
 let STATE = null, chart = null, scenarioSeries = null;
 
