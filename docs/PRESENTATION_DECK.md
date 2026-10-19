@@ -73,10 +73,12 @@ sandbox ledger · injection scanner + PII mask + approval store + audit.
 # 13 weeks, with proof it works
 
 - Per-category LightGBM (lags, rolling stats, calendar features), recursive
-  P50 + residual-quantile P10–P90 band
+  P50 + asymmetric residual-quantile P10–P90 band
 - Committed payments (rent, payroll, tax, equipment) projected as certain
 - **Backtest vs seasonal naive — LightGBM wins on all 4 scorable categories:**
   POS 2.3 vs 2.8 · Online 7.5 vs 8.5 · Supplies 13.3 vs 15.0 · Packaging 9.9 vs 13.1 WAPE
+- **Calibrated uncertainty — measured band coverage 75–87.5%** on held-out
+  weeks (ideal 80%): the interval is honest, not drawn for show
 
 *Notes: show the chart — P50 line, band, buffer floor, committed bars —
 then open the "Forecast model accuracy" fold under it: the same WAPE table

@@ -67,12 +67,12 @@ pre{background:var(--panel);border:1px solid #2a3a55;border-radius:10px;padding:
 </div>
 <div class="slide">
 <h1>Forecasting: numbers in code, never the LLM</h1>
-<ul><li>Per-category LightGBM — lags, rolling stats, calendar features; recursive P50 + residual-quantile P10–P90 band</li>
+<ul><li>Per-category LightGBM — lags, rolling stats, calendar features; recursive P50 + asymmetric residual-quantile P10–P90 band</li>
 <li>Committed payments (rent, payroll, tax, equipment) projected as certain outflows</li>
 <li>Balance projected week by week; first breach of the buffer = gap week</li></ul>
 <h2>Backtest vs seasonal naive — LightGBM wins all 4 scorable categories</h2>
 <ul><li>POS <span class="ok">2.3</span> vs 2.8 · Online <span class="ok">7.5</span> vs 8.5 · Supplies <span class="ok">13.3</span> vs 15.0 · Packaging <span class="ok">9.9</span> vs 13.1 (WAPE)</li></ul>
-<p class="k">The same WAPE table ships inside the product — "Forecast model accuracy" fold under the chart.</p>
+<p class="k">The same WAPE table + measured band coverage (75–87.5% held-out) ships inside the product — "Forecast model accuracy" fold under the chart.</p>
 <div class="num">5 / 11</div>
 </div>
 <div class="slide">

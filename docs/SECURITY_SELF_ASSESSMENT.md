@@ -69,8 +69,10 @@ acct 8841-XX"*).
 4. **Auditability** — flagged inputs are recorded
    (`user_input_flagged`, `tool_denied` events).
 
-Patterns: `app/security.py::JAILBREAK_PATTERNS` (both channels) +
-`DATA_ONLY_PATTERNS` (data channel only).
+Patterns: `app/security.py::JAILBREAK_PATTERNS` (both channels — includes
+prompt-extraction like "reveal your system prompt" and persona-shift like
+"developer mode") + `DATA_ONLY_PATTERNS` (data channel only). Flagged user
+input still gets an answer — the warning and the gate, not a refusal.
 
 ## 4. Other controls
 
