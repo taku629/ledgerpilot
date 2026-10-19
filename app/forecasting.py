@@ -255,8 +255,17 @@ def forecast_cashflow(txn: pd.DataFrame, sched: pd.DataFrame, profile: dict,
         inflow = sum(m["p50"][w - 1] for m in modeled if m["flow"] == "inflow")
         outflow_m = sum(m["p50"][w - 1] for m in modeled if m["flow"] == "outflow")
         outflow_c = float(sched_by_week.get(w, 0.0))
+        week_committed = sched_rows[sched_rows.week == w][
+            ["date", "category", "counterparty", "amount", "payment_id", "memo"]
+        ].to_dict("records") if len(sched_rows) else []
         if extra_out.get("week") == w:
             outflow_c += float(extra_out.get("amount", 0))
+            week_committed.append({
+                "date": start_d.isoformat(), "category": "what-if scenario",
+                "counterparty": "scenario input",
+                "amount": float(extra_out.get("amount", 0)),
+                "payment_id": "whatif",
+                "memo": extra_out.get("label") or "extra outflow"})
         if extra_in.get("week") == w:
             inflow += float(extra_in.get("amount", 0))
         band2_lo = sum(m["band_lo"][w - 1] ** 2 for m in modeled) ** 0.5
@@ -273,9 +282,7 @@ def forecast_cashflow(txn: pd.DataFrame, sched: pd.DataFrame, profile: dict,
             "balance_p50": round(balance, 2),
             "balance_p10": round(balance - band2_lo, 2),
             "balance_p90": round(balance + band2_hi, 2),
-            "committed": sched_rows[sched_rows.week == w][
-                ["date", "category", "counterparty", "amount", "payment_id", "memo"]
-            ].to_dict("records") if len(sched_rows) else [],
+            "committed": week_committed,
         })
 
     gap_week = next((w for w in out_weeks
