@@ -103,7 +103,11 @@ def index():
 
 @app.get("/healthz")
 def healthz():
-    return {"ok": True, "llm_configured": bool(LLM_BASE_URL)}
+    v = audit.verify()
+    return {"ok": True, "llm_configured": bool(LLM_BASE_URL),
+            "as_of": ctx.forecast()["as_of"],
+            "audit_events": v["events"], "audit_integrity_ok": v["ok"],
+            "transactions": len(ctx.txn), "invoices": len(ctx.invoices)}
 
 
 @app.get("/api/state")

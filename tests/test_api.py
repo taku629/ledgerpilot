@@ -173,3 +173,11 @@ def test_rate_limit_trips_after_burst():
         assert r.status_code == 200
     r = client.post("/api/chat", json={"message": "hi"})
     assert r.status_code == 429
+
+
+def test_healthz_reports_integrity():
+    r = client.get("/healthz")
+    assert r.status_code == 200
+    d = r.json()
+    assert d["ok"] and d["audit_integrity_ok"] is True
+    assert d["transactions"] > 0 and d["as_of"]
