@@ -169,9 +169,10 @@ class DeterministicBackend:
         catq = re.search(
             r"(rent|payroll|salary|staff|wages|loan|equipment|insurance|utilities|"
             r"marketing|software|pos|repairs|maintenance|professional services|"
-            r"delivery|platform fees|tax)\b.*(up|increase|rais|higher|jump|spike)",
+            r"delivery|platform fees|tax)\b.*(up|increase|rais|higher|jump|spike|"
+            r"ris(e|ing)|going up|climb|more expensive|doubl|tripl|bill|payment|cost)",
             msg) or re.search(
-            r"(up|increase|rais|higher)\b.*"
+            r"(up|increase|rais|higher|ris(e|ing)|going up|climb|doubl|tripl)\b.*"
             r"(rent|payroll|salary|staff|wages|loan|equipment|insurance|utilities|"
             r"marketing|software|pos|repairs|maintenance|professional services|"
             r"delivery|platform fees|tax)", msg)
@@ -189,8 +190,13 @@ class DeterministicBackend:
             rows = ctx.scheduled[ctx.scheduled.category.str.lower().str.contains(
                 words.get(hit, "__none__"), regex=False)] if hit else ctx.scheduled.iloc[:0]
             if not rows.empty:
-                pct = abs(self._parse_pct(msg)) if re.search(
-                    r"\d+(?:\.\d+)?\s*(?:%|percent)", msg) else 0
+                if re.search(r"doubl", msg):
+                    pct = 100.0
+                elif re.search(r"tripl", msg):
+                    pct = 200.0
+                else:
+                    pct = abs(self._parse_pct(msg)) if re.search(
+                        r"\d+(?:\.\d+)?\s*(?:%|percent)", msg) else 0
                 fc0 = ctx.forecast()
                 horizon_end = pd.Timestamp(fc0["as_of"]) + pd.Timedelta(weeks=13)
                 step = {"weekly": pd.Timedelta(weeks=1),
@@ -281,7 +287,7 @@ class DeterministicBackend:
 
         # ---- why is week N bad ----
         wq = re.search(r"week\s*(\d+)", msg)
-        if wq and re.search(r"(why|bad|low|dip|drop|problem|happen|what)", msg):
+        if wq and re.search(r"(why|bad|low|dip|drop|problem|happen|what|about|show|tell|detail|explain|breakdown|everything)", msg):
             wn = int(wq.group(1))
             fc = call("get_cashflow_forecast")
             w = next((x for x in fc["weeks"] if x["week"] == wn), None)
@@ -339,6 +345,29 @@ class DeterministicBackend:
                          f"overdue AR {_fmt(wc['overdue_receivables'])} ({wc['overdue_count']} invoices).")
             return self._reply({"text": "\n".join(lines)}, calls, injected_warn,
                                data={"kpis": k})
+
+        # ---- financing sorts (beat the generic financing intent) ----
+        if re.search(r"(cheapest|lowest cost|best (rate|deal|apr)|interest rate|apr)", msg):
+            m = call("match_financing")
+            by = sorted(m["ranked"], key=lambda r: r["est_total_cost"])
+            lines = [f"Cheapest options for the {_fmt(m['gap_amount'])} gap "
+                     "(by estimated total cost):"]
+            lines += [f"- **{r['name']}** — {_fmt(r['est_total_cost'])} "
+                      f"({r['apr_or_fee']}), funds in {r['time_to_fund_days']}d"
+                      for r in by[:3]]
+            lines.append(DISCLAIMER)
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn,
+                               data={"financing": m})
+        if re.search(r"(fastest|quickest|soonest|fast way|fast option|urgently)", msg):
+            m = call("match_financing")
+            by = sorted(m["ranked"], key=lambda r: r["time_to_fund_days"])
+            lines = [f"Fastest options for the {_fmt(m['gap_amount'])} gap "
+                     f"(first breach week {m['gap_week']}):"]
+            lines += [f"- **{r['name']}** — funds in ~{r['time_to_fund_days']}d, "
+                      f"est. cost {_fmt(r['est_total_cost'])}" for r in by[:3]]
+            lines.append(DISCLAIMER)
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn,
+                               data={"financing": m})
 
         if re.search(r"(financ|loan|fund|credit|borrowing|options|gap)", msg):
             call("get_cashflow_forecast")
@@ -523,6 +552,67 @@ class DeterministicBackend:
                        f"buffer (week {fc0['gap_week']}). Cover the gap first "
                        f"(ask me for financing options) before discretionary spend.")
             return self._reply({"text": txt}, calls, injected_warn)
+
+        # ---- invoice count ----
+        if re.search(r"(how many|number of|count)\b.*(invoice|bill)", msg):
+            inv = ctx.invoices
+            open_n = int((inv.status == "open").sum())
+            over_n = int((inv.status == "overdue").sum())
+            paid_n = int((inv.status == "paid").sum())
+            txt = (f"{len(inv)} invoices on file — {paid_n} paid, {open_n} open, "
+                   f"{over_n} overdue (open total "
+                   f"{_fmt(inv[inv.status != 'paid'].amount.sum())}).")
+            return self._reply({"text": txt}, calls, injected_warn)
+
+        # ---- counterparty lookup: "who is Northwind" ----
+        wis = re.search(r"who (?:is|are)\s+([\w& .'-]+)", msg)
+        if wis and not re.search(r"who (is|are) (you|u)\b", msg):
+            term = wis.group(1).strip().rstrip("?.,")
+            inv_hits = ctx.invoices[ctx.invoices.customer.str.lower().str.contains(
+                term.lower(), regex=False)]
+            txn_hits = ctx.txn[ctx.txn.counterparty.str.lower().str.contains(
+                term.lower(), regex=False)]
+            if not inv_hits.empty or not txn_hits.empty:
+                name = (inv_hits.customer.iloc[0] if not inv_hits.empty
+                        else txn_hits.counterparty.iloc[0])
+                lines = [f"**{name}** —"]
+                if not inv_hits.empty:
+                    open_inv = inv_hits[inv_hits.status != "paid"]
+                    lines.append(f"- {len(inv_hits)} invoices issued, "
+                                 f"{_fmt(inv_hits.amount.sum())} billed; "
+                                 f"{len(open_inv)} unpaid "
+                                 f"({_fmt(open_inv.amount.sum())})")
+                    for _, o in open_inv.iterrows():
+                        lines.append(f"  - `{o.id}` {_fmt(o.amount)} {o.status}, "
+                                     f"due {o.due_date}")
+                if not txn_hits.empty:
+                    flow = txn_hits.groupby("flow").amount.sum()
+                    lines.append(f"- {len(txn_hits)} ledger transactions: "
+                                 + ", ".join(f"{k} {_fmt(v)}"
+                                              for k, v in flow.items()))
+                return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- executive summary ----
+        if re.search(r"(executive summary|exec summary|summar|overview|"
+                     r"financial (status|position|health)|status update|recap|briefing)", msg):
+            fc0 = call("get_cashflow_forecast")
+            al = call("get_alerts")
+            k = call("get_kpis")
+            wc = k["working_capital"]
+            full = [m for m in k["monthly_pl"] if not m["partial"]]
+            m0 = full[-1]
+            lines = [
+                f"**Harbor & Bean — as of {fc0['as_of']}**",
+                f"- Cash {_fmt(fc0['balance_start'])}; 13-wk floor "
+                f"{_fmt(fc0['min_balance'])} vs {_fmt(fc0['cash_buffer'])} buffer "
+                f"(gap {_fmt(max(fc0['gap_amount'], 0))}, first breach week "
+                f"{fc0['gap_week'] or 'none'})",
+                f"- {m0['month']} revenue {_fmt(m0['revenue'])}, margin "
+                f"{m0['gross_margin_pct']}%, net {_fmt(m0['net_cashflow'])}",
+                f"- {al['count']} active alerts; overdue AR "
+                f"{_fmt(wc['overdue_receivables'])} ({wc['overdue_count']} invoices)",
+                "Ask 'what should I do first' for the ranked plan."]
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
 
         # ---- cash-out timing ----
         if re.search(r"(run out|out of cash|go (negative|bust|bankrupt)|negative balance|below (the )?buffer|survive)", msg):

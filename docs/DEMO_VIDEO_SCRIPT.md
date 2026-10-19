@@ -81,7 +81,12 @@ drivers table.
 > "What if sales drop twenty percent? The scenario recomputes instantly —
 > the purple line is the new projection, the buffer breach moves earlier."
 
-**Do:** Reset.
+**Do:** Reset. Then in chat type **`what happens if rent goes up 15%`**.
+
+> "Or ask it in words: rent is a monthly scheduled payment — the copilot
+> counts three occurrences inside the thirteen-week window and prices the
+> shock at $2,520, dropping the floor to $14,158. Frequency-aware, not a
+> flat percentage guess."
 
 ## Scene 6 — Sandbox action with approval (2:45–3:45)
 

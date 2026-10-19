@@ -315,3 +315,19 @@ def test_category_cost_change_respects_frequency(ctx):
     r = _respond(ctx, "what if rent goes up 15%")["reply"]
     # Rent is monthly: 3 payments inside the 13-week window
     assert "× 3" in r and "+$2,520" in r
+
+
+@pytest.mark.parametrize("q,needle", [
+    ("what if rent doubles", "+$16,800"),
+    ("payroll costs are rising", "pay-010"),
+    ("what about my tax bill", "pay-011"),
+    ("show me everything about week 7", "Week 7"),
+    ("how many invoices", "15 invoices"),
+    ("who is northwind", "Northwind Catering"),
+    ("give me an executive summary", "as of"),
+    ("cheapest financing", "Cheapest options"),
+    ("fastest financing option", "Fastest options"),
+    ("whats the interest rate on the loan", "total cost"),
+])
+def test_agent_third_wave_intents(ctx, q, needle):
+    assert needle in _respond(ctx, q)["reply"]
