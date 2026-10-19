@@ -152,6 +152,19 @@ def test_audit_jsonl_export():
     assert events and all("kind" in e for e in events)
 
 
+def test_financing_memo_markdown():
+    """Decision memo: deterministic markdown with gap, ranked + rejected
+    tables and the not-advice disclaimer — evidence for judges."""
+    r = client.get("/api/financing/memo")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("text/markdown")
+    assert "attachment" in r.headers["content-disposition"]
+    t = r.text
+    assert "Financing decision memo" in t
+    assert "## Ranked options" in t and "## Rejected" in t
+    assert "not financial advice" in t
+
+
 def test_rate_limit_trips_after_burst():
     from app.main import chat_limiter
     chat_limiter._buckets.clear()

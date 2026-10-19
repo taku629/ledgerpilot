@@ -28,6 +28,7 @@ main{display:grid;grid-template-columns:390px 1fr;height:calc(100vh - 64px)}
 .chip{font-size:10.5px;background:#0d1420;border:1px solid var(--line);color:var(--dim);padding:2px 8px;border-radius:10px}
 .approval{align-self:stretch;background:#1a1503;border:1px solid #5a4a10;border-radius:12px;padding:12px 14px}
 .approval .ttl{color:var(--warn);font-weight:600;margin-bottom:6px}
+.approval .ttl2{color:var(--dim);font-size:11px;margin:-4px 0 6px}
 .approval .prev{font-size:13px;margin-bottom:10px}
 .approval .btns{display:flex;gap:8px}
 .approval button{padding:6px 16px;border-radius:8px;border:0;cursor:pointer;font-weight:600}

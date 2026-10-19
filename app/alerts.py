@@ -9,18 +9,25 @@ def detect_alerts(forecast: dict, invoices: pd.DataFrame, txn: pd.DataFrame,
     alerts = []
     buffer = float(profile.get("cash_buffer", 0))
 
-    # 1. projected balance below buffer
-    for w in forecast["weeks"]:
-        if w["balance_p50"] < buffer:
-            sev = "critical" if w["balance_p50"] < 0 else "high"
-            alerts.append({
-                "id": f"lowbal-w{w['week']}", "type": "LOW_BALANCE", "severity": sev,
-                "title": f"Projected balance ${w['balance_p50']:,.0f} falls below "
-                         f"${buffer:,.0f} buffer in week {w['week']}",
-                "detail": f"Week {w['start']}–{w['end']}: inflow ${w['inflow_p50']:,.0f}, "
-                          f"outflow ${w['outflow_modeled'] + w['outflow_committed']:,.0f}.",
-                "evidence": {"week": w["week"], "committed": w["committed"]},
-            })
+    # 1. projected balance below buffer — one grouped alert, all breach weeks
+    breach = [w for w in forecast["weeks"] if w["balance_p50"] < buffer]
+    if breach:
+        worst = min(breach, key=lambda w: w["balance_p50"])
+        weeks_l = ", ".join(str(w["week"]) for w in breach)
+        alerts.append({
+            "id": "lowbal", "type": "LOW_BALANCE",
+            "severity": "critical" if worst["balance_p50"] < 0 else "high",
+            "title": f"Projected balance falls below the ${buffer:,.0f} buffer "
+                     f"in {len(breach)} weeks — first breach week {breach[0]['week']}",
+            "detail": f"Worst point ${worst['balance_p50']:,.0f} in week {worst['week']} "
+                      f"({worst['start']}). Breach weeks: {weeks_l}.",
+            "evidence": {"weeks": [
+                {"week": w["week"], "start": w["start"], "end": w["end"],
+                 "balance_p50": w["balance_p50"], "inflow_p50": w["inflow_p50"],
+                 "outflow": w["outflow_modeled"] + w["outflow_committed"],
+                 "committed": w["committed"]}
+                for w in breach]},
+        })
 
     # 2. clustered large committed payments in one week (>25% of typical monthly outflow)
     mo_out = txn[txn.flow == "outflow"].amount.sum()

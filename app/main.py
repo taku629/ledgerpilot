@@ -146,6 +146,42 @@ def financing():
                                    gap if gap > 0 else 20000, fc["gap_week"])
 
 
+@app.get("/api/financing/memo")
+def financing_memo():
+    """Deterministic decision memo (markdown): gap, ranked options with cost
+    math, rejected options with reasons, disclaimer. Downloadable."""
+    from . import financing as fin_mod
+    fc = ctx.forecast()
+    gap = max(fc["gap_amount"], 0)
+    m = fin_mod.match_financing(ctx.catalog, ctx.financing_ctx(),
+                                gap if gap > 0 else 20000, fc["gap_week"])
+    worst = min(fc["weeks"], key=lambda w: w["balance_p50"])
+    L = [f"# Financing decision memo — {ctx.profile['business_name']}",
+         f"_Generated {fc['as_of']} from the 13-week forecast. "
+         "All figures computed by code; no AI estimates._", "",
+         f"- **Funding gap:** ${m['gap_amount']:,.0f} "
+         f"{'(first breach week ' + str(m['gap_week']) + ')' if m['gap_week'] else '(no breach — planning amount)'}",
+         f"- **Lowest projected balance:** ${worst['balance_p50']:,.0f} "
+         f"in week {worst['week']} ({worst['start']})",
+         f"- **Cash buffer policy:** ${ctx.profile['cash_buffer']:,.0f}", "",
+         "## Ranked options",
+         "| # | Product | Type | Score | Amount | Est. total cost | Monthly | Funds in | Why |",
+         "|--:|---|---|--:|--:|--:|--:|--:|---|"]
+    for i, r in enumerate(m["ranked"], 1):
+        L.append(f"| {i} | {r['name']} | {r['type']} | {r['score']} | "
+                 f"${r['amount']:,.0f} | ${r['est_total_cost']:,.0f} | "
+                 f"${r['est_monthly_payment']:,.0f} | {r['time_to_fund_days']}d | {r['why']} |")
+    L += ["", "## Rejected — and why",
+          "| Product | Reason |", "|---|---|"]
+    for r in m["rejected"]:
+        L.append(f"| {r['name']} | {'; '.join(r['reasons'])} |")
+    L += ["", f"_{m['disclaimer']}_", "",
+          "_LedgerPilot sandbox memo — no real funding application was made._"]
+    return PlainTextResponse(
+        "\n".join(L), media_type="text/markdown",
+        headers={"Content-Disposition": 'attachment; filename="financing_memo.md"'})
+
+
 @app.post("/api/whatif")
 def whatif(w: WhatIfIn):
     params = {k: v for k, v in w.model_dump().items() if v not in (0, None)}

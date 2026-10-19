@@ -135,6 +135,20 @@ def test_alerts_have_evidence(ctx):
         assert a.get("evidence"), a["type"]
 
 
+def test_low_balance_alerts_grouped_with_weeks(ctx):
+    """Consecutive breach weeks must collapse into ONE grouped alert whose
+    evidence lists every breach week — signal over noise."""
+    out = tools.call_tool(ctx, "get_alerts", {})
+    lb = [a for a in out["alerts"] if a["type"] == "LOW_BALANCE"]
+    assert len(lb) == 1
+    weeks = lb[0]["evidence"]["weeks"]
+    assert len(weeks) >= 2 and all("balance_p50" in w for w in weeks)
+    f = tools.call_tool(ctx, "get_cashflow_forecast", {})
+    expected = [w["week"] for w in f["weeks"]
+                if w["balance_p50"] < ctx.profile["cash_buffer"]]
+    assert [w["week"] for w in weeks] == expected
+
+
 # ---------- Financing ----------
 
 def test_financing_ranked_and_rejected(ctx):

@@ -135,7 +135,15 @@ function showAlertEvidence(id) {
   if (!a) return;
   let html = `<h2>${esc(a.title)}</h2><p style="color:var(--dim);font-size:12px;margin:8px 0">${esc(a.detail)}</p>`;
   const ev = a.evidence || {};
-  if (ev.committed?.length) {
+  if (ev.weeks?.length) {
+    html += `<h2>Weeks below buffer</h2><table>
+      <tr><th>Week</th><th>Dates</th><th>Projected balance</th><th>Inflow</th><th>Outflow</th><th></th></tr>` +
+      ev.weeks.map(w => `<tr><td>W${w.week}</td><td>${w.start} → ${w.end}</td>
+        <td class="${w.balance_p50 < 0 ? "neg" : ""}">${fmt(w.balance_p50)}</td>
+        <td>${fmt(w.inflow_p50)}</td><td>${fmt(w.outflow)}</td>
+        <td><button class="chip evWeek" data-w="${w.week}">evidence →</button></td></tr>`).join("") +
+      `</table>`;
+  } else if (ev.committed?.length) {
     html += `<h2>Committed payments — week ${ev.week}</h2><table>
       <tr><th>Date</th><th>Category</th><th>Counterparty</th><th>Amount</th><th>ID</th><th></th></tr>` +
       ev.committed.map(c => `<tr><td>${c.date}</td><td>${esc(c.category)}</td>
@@ -168,6 +176,8 @@ function showAlertEvidence(id) {
     $("#modalBg").classList.remove("open");
     send(`reschedule ${b.dataset.id} to ${d.toISOString().slice(0, 10)}`);
   });
+  document.querySelectorAll(".evWeek").forEach(b => b.onclick = () =>
+    showWeekEvidence(+b.dataset.w));
 }
 
 function showWeekEvidence(wk) {
@@ -222,7 +232,8 @@ function renderFinTable(m) {
   $("#finTable").innerHTML = `
     <div class="fineprint" style="padding:0 0 10px">Funding gap
     <b style="color:var(--warn)">${fmt(m.gap_amount)}</b>${m.gap_week ? ` first hit in week ${m.gap_week}` : ""}
-    — ranked by coverage, cost, speed vs the gap, and payment burden.</div>
+    — ranked by coverage, cost, speed vs the gap, and payment burden.
+    <a href="/api/financing/memo" download="financing_memo.md">Download decision memo (markdown)</a></div>
     <table><tr><th>Score</th><th>Product</th><th>Type</th><th>Est. cost</th>
     <th>Funds in</th><th>Coverage</th><th>Why</th></tr>` +
     m.ranked.map(r => `<tr><td><span class="finScore">${r.score}</span></td>
@@ -281,10 +292,30 @@ function addMsg(who, html) {
 function addApprovalCard(pa) {
   const d = document.createElement("div");
   d.className = "approval";
-  d.innerHTML = `<div class="ttl">Approval required — Tier 2 sandbox action</div>
+  const expiryLine = pa.expires_in_s
+    ? `<div class="ttl2">single use · expires in <b class="exp"></b></div>` : "";
+  d.innerHTML = `<div class="ttl">Approval required — Tier 2 sandbox action</div>${expiryLine}
     <div class="prev">${esc(pa.preview || pa.tool)}</div>
     <div class="btns"><button class="approve">Approve &amp; execute</button>
     <button class="deny">Reject</button></div>`;
+  if (pa.expires_in_s) {
+    const end = Date.now() + pa.expires_in_s * 1000;
+    const el = d.querySelector(".exp");
+    const tick = () => {
+      const s = Math.max(0, Math.round((end - Date.now()) / 1000));
+      el.textContent = `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
+      if (s === 0) {
+        clearInterval(iv);
+        if (!d.classList.contains("done")) {
+          d.classList.add("done");
+          d.querySelectorAll("button").forEach(b => b.disabled = true);
+          d.querySelector(".prev").innerHTML += `<br><b class="neg">Approval expired — ask again to re-issue.</b>`;
+        }
+      }
+    };
+    const iv = setInterval(tick, 1000);
+    tick();
+  }
   d.querySelector(".approve").onclick = async () => {
     d.querySelectorAll("button").forEach(b => b.disabled = true);
     try {
