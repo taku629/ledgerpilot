@@ -51,4 +51,4 @@ ranked action plan from live alerts + forecast, and each line names the next com
 - Backtest WAPE: model beats seasonal-naive in **4/4** categories; band coverage 75–87.5%
 - Overdue AR: INV-0014 Northwind Catering, $2,929, 25d
 - Week-7 committed cluster: $22,450 (rent + equipment + loan)
-- 97 pytest cases, all green
+- 98 pytest cases, all green
