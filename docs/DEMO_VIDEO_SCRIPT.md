@@ -68,6 +68,12 @@ drivers table.
 > Trade credit wins; factoring is close. And it says *why not* the others:
 > the bank loan is too slow for a week-2 gap, the MCA cost is high."
 
+**Do:** Click **Download decision memo** — a markdown file opens.
+
+> "And the whole comparison — gap, ranked costs, rejection reasons —
+> exports as a decision memo the owner can hand to their accountant.
+> Deterministic, dated, with the not-advice disclaimer attached."
+
 ## Scene 5 — What-if (2:20–2:45)
 
 **Do:** Drag the **Sales** slider to −20% → **Apply what-if**.
@@ -83,13 +89,16 @@ drivers table.
 
 > "Now the agent proposes a real action — move the $16,000 equipment
 > payment to January 5th. Look at the card: *Approval required — Tier 2
-> sandbox action*. The model cannot execute anything by itself."
+> sandbox action*, and a live countdown — the token is single-use and
+> dies in five minutes. The model cannot execute anything by itself."
 
 **Do:** Click **Approve & execute**. Point at the chart updating + audit tab.
 
 > "One click of approval consumes a single-use, five-minute token — and
 > the forecast immediately re-projects. Replay the same approval and the
-> server refuses it. Every step is in the audit log, PII-masked."
+> server refuses it. Every step is in the audit log, PII-masked — and
+> hash-chained: the Audit tab verifies the chain live, so a tampered
+> record can't hide."
 
 ## Scene 7 — Injection defense (3:45–4:20)
 
