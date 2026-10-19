@@ -148,7 +148,7 @@ class DeterministicBackend:
             return self._reply(out, calls, injected_warn, pending=out)
 
         # ---- drafts ----
-        if re.search(r"(draft|write|send).*(remind|chase|dunning|overdue|payment reminder|collect)", msg) \
+        if re.search(r"(draft|write|send|compose|chase).*(remind|dunning|overdue|payment reminder|collect|late|unpaid|payer|email)", msg) \
                 or "reminder" in msg:
             inv = ctx.invoices[ctx.invoices.status == "overdue"]
             if inv.empty:
@@ -166,7 +166,10 @@ class DeterministicBackend:
             return self._reply(out, calls, injected_warn)
 
         # ---- what-if ----
-        wi = re.search(r"(what[- ]?if|if .* (drop|fall|decline|grow|rise|increase|decrease)|scenario)", msg)
+        wi = re.search(r"(what[- ]?if|if .* (drop|fall|decline|grow|rise|increase|decrease)|scenario)", msg) \
+            or re.search(r"(increase|raise|cut|reduce|decrease|drop|grow|lift|lower)\b.*"
+                         r"(price|prices|sales|revenue|cost|supplies|expense)", msg) \
+            or re.search(r"(price|sales|revenue|cost)s?\b.*(up|down|rise|higher|lower)", msg)
         if wi:
             pct = self._parse_pct(msg)
             args = {"sales_pct": pct}
@@ -397,6 +400,93 @@ class DeterministicBackend:
                                  f"{'+' if dv >= 0 else ''}{dv:,.1f}{'%' if unit == '%' else ''} |")
                 return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
 
+        # ---- priority action plan ----
+        if re.search(r"(what should|recommend|prioriti|action plan|next steps?|avoid|improve|first (thing|step)|help me)", msg):
+            al = call("get_alerts")["alerts"]
+            fc = call("get_cashflow_forecast")
+            m = call("match_financing")
+            by_type = {a["type"]: a for a in al}
+            lines = ["In order of impact:"]
+            i = 0
+            ar = by_type.get("AR_OVERDUE")
+            if ar:
+                i += 1
+                ev = ar["evidence"]
+                lines.append(
+                    f"{i}. **Collect `{ev['invoice_id']}` {_fmt(ev['amount'])}** "
+                    f"({ev['customer']}, {ev['days_overdue']}d overdue) — "
+                    f"say `draft a payment reminder for {ev['invoice_id']}`")
+            lb = by_type.get("LOW_BALANCE")
+            if lb:
+                i += 1
+                worst = min(lb["evidence"]["weeks"],
+                            key=lambda w: w["balance_p50"])
+                top = m["ranked"][0] if m["ranked"] else None
+                fin = (f" — fastest cover: **{top['name']}** "
+                       f"({_fmt(top['est_total_cost'])} est. cost, "
+                       f"funds in {top['time_to_fund_days']}d)" if top else "")
+                lines.append(
+                    f"{i}. **Cover the {_fmt(m['gap_amount'])} gap** — worst "
+                    f"point {_fmt(worst['balance_p50'])} in week "
+                    f"{worst['week']}{fin}")
+            cl = by_type.get("PAYMENT_CLUSTER")
+            if cl and cl["evidence"].get("committed"):
+                i += 1
+                c = cl["evidence"]["committed"][0]
+                lines.append(
+                    f"{i}. **Spread week-{cl['evidence']['week']} payments** — "
+                    f"e.g. `reschedule {c['payment_id']}` moves "
+                    f"{_fmt(c['amount'])} {c['category']} out of the cluster")
+            if i == 0:
+                lines = ["No urgent gaps: balance stays above the buffer, "
+                         "receivables are current. Idle cash could sit in a "
+                         "higher-yield account — see financing options."]
+            lines.append("Every Tier-2 action still needs your approval click.")
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- security posture ----
+        if re.search(r"(safe|secure|security|privacy|trust|data safe|compliant)", msg):
+            lines = [
+                "How I'm contained:",
+                "- **Tier-0/1/2 permissions** — I read and draft freely, but "
+                "every sandbox action needs your click on a single-use, "
+                "5-minute approval token",
+                "- **Injection defense** — memos and chat are scanned; flagged "
+                "text becomes inert data and raises an alert",
+                "- **Audit trail** — every call, proposal and denial is "
+                "hash-chained in an append-only log you can export",
+                "- **PII masking** — names, emails and account numbers are "
+                "masked before storage or display",
+                "Nothing I suggest is financial advice — figures come from "
+                "code, the wording is mine."]
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- audit log viewer ----
+        if re.search(r"(audit log|audit trail|operation log|show.*(log|events)|what did you do)", msg):
+            rows = ctx.audit.tail(8)
+            v = ctx.audit.verify()
+            lines = [f"Latest operations ({v['events']} events, "
+                     f"{'integrity verified' if v['ok'] else 'CHAIN BROKEN'}):"] + [
+                f"- {e.get('ts','')[:19]} — {e.get('kind','?')}"
+                for e in rows]
+            lines.append("Full trail + JSONL download: Audit tab.")
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- upcoming payments ----
+        if re.search(r"(when is|when are|due|upcoming|scheduled|list|show).*(payment|rent|bill|payable)|list (my )?payments", msg):
+            fc = call("get_cashflow_forecast")
+            seen = {}
+            for w in fc["weeks"]:
+                for c in w["committed"]:
+                    seen.setdefault(c["payment_id"], c)
+            ups = sorted(seen.values(), key=lambda c: c["date"])[:8]
+            lines = ["Upcoming committed payments:"] + [
+                f"- {c['date']} `{c['payment_id']}` {c['category']} — "
+                f"{_fmt(c['amount'])} ({c['counterparty']})" for c in ups]
+            lines.append("Say `reschedule pay-0001 to 2026-12-01` to move one "
+                         "(needs your approval).")
+            return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
         if re.search(r"(transaction|history|recent|spend|expense list)", msg):
             t = call("load_transactions", {"months": 1})
             lines = [f"{t['count']} transactions in the last month. Largest:"]
@@ -404,6 +494,14 @@ class DeterministicBackend:
             lines += [f"- {r['date']} {r['category']} {r['counterparty']}: "
                       f"{_fmt(r['amount'])} ({r['flow']})" for r in big]
             return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- identity ----
+        if re.search(r"(who are you|what are you|your name|about you)", msg):
+            return self._reply({"text":
+                "I'm **LedgerPilot** — a finance copilot for small-business "
+                "owners. I forecast cash flow, explain the numbers, match "
+                "financing, and prepare sandbox actions you approve with a "
+                "click. All math is code; I only do the explaining."}, calls, injected_warn)
 
         # ---- default: help ----
         return self._reply({"text":
@@ -467,9 +565,9 @@ class DeterministicBackend:
         return inv.sort_values("due_date").iloc[0].id
 
     def _parse_pct(self, msg):
-        m = re.search(r"(\d+)\s*%", msg)
+        m = re.search(r"(\d+(?:\.\d+)?)\s*(?:%|percent)", msg)
         v = float(m.group(1)) if m else 20.0
-        return -v if re.search(r"drop|fall|decline|decrease|down|lose", msg) else v
+        return -v if re.search(r"drop|fall|decline|decrease|down|lose|cut|reduce|lower", msg) else v
 
     def _top_committed(self, fc):
         w = max(fc["weeks"], key=lambda x: x["outflow_committed"])

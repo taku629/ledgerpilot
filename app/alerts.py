@@ -56,7 +56,8 @@ def detect_alerts(forecast: dict, invoices: pd.DataFrame, txn: pd.DataFrame,
             "title": f"{r.customer} invoice {r.id} is {days}d overdue (${r.amount:,.0f})",
             "detail": f"Due {r.due_date:%Y-%m-%d}; still unpaid. Consider a payment reminder.",
             "evidence": {"invoice_id": r.id, "customer": r.customer,
-                         "due_date": r.due_date.strftime("%Y-%m-%d"), "amount": r.amount},
+                         "due_date": r.due_date.strftime("%Y-%m-%d"),
+                         "amount": r.amount, "days_overdue": days},
         })
 
     # 4. instruction-like text inside financial records (injection watch)

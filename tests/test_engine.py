@@ -281,6 +281,12 @@ def test_agent_judge_question_intents(ctx):
         ("what is my burn rate", "/week"),
         ("can I afford a $4,000/month hire", "buffer"),
         ("compare this month to last", "| Metric |"),
+        ("what should I do first", "In order of impact"),
+        ("write an email to a late payer", "Draft ready"),
+        ("is my data safe", "approval token"),
+        ("when is rent due", "committed payments"),
+        ("increase prices 10 percent", "sales_pct=10"),
+        ("who are you", "LedgerPilot"),
     ]
     for q, needle in checks:
         r = _respond(ctx, q)
