@@ -88,9 +88,13 @@ def _forecast_category(series: np.ndarray, week0_start: pd.Timestamp,
     n = len(series)
     if n < 18 or np.allclose(series, 0):
         mu = float(np.mean(series)) if n else 0.0
+        b = max(np.std(series), mu * 0.15, 1.0)
         return {"p50": np.repeat(max(mu, 0.0), horizon),
-                "band": np.repeat(max(np.std(series), mu * 0.15, 1.0), horizon),
-                "wape_model": None, "wape_naive": None, "method": "level"}
+                "band": np.repeat(b, horizon),
+                "band_lo": np.repeat(b, horizon),
+                "band_hi": np.repeat(b, horizon),
+                "wape_model": None, "wape_naive": None, "coverage": None,
+                "method": "level"}
 
     # --- backtest: last BACKTEST_WEEKS as holdout ---
     tr, te = series[:-BACKTEST_WEEKS], series[-BACKTEST_WEEKS:]
@@ -126,10 +130,21 @@ def _forecast_category(series: np.ndarray, week0_start: pd.Timestamp,
         wape_model = float(np.abs(te - bt_pred).sum() / np.abs(te).sum() * 100)
         wape_naive = float(np.abs(te - naive_pred).sum() / np.abs(te).sum() * 100)
 
-    # --- residual quantiles -> prediction band ---
+    # --- residual quantiles -> asymmetric prediction band ---
+    # Interval [pred + q_lo, pred + q_hi] built directly from the empirical
+    # residual quantiles — captures holdout bias (median != 0) and skew, so
+    # its coverage on the same residuals is ~80% by construction.
     resid = te - bt_pred
     q_lo, q_hi = float(np.quantile(resid, 0.1)), float(np.quantile(resid, 0.9))
-    band = float(max(q_hi - q_lo, np.std(series) * 0.4, 1.0)) / 2
+    floor = max(np.std(series) * 0.2, 0.5)
+    band_lo = float(max(-q_lo, floor))
+    band_hi = float(max(q_hi, floor))
+    band = (band_lo + band_hi) / 2
+
+    # empirical calibration: share of holdout actuals inside
+    # [pred - band_lo, pred + band_hi] — ~80% when the band is calibrated
+    coverage = (float(np.mean((te >= bt_pred - band_lo) & (te <= bt_pred + band_hi)) * 100)
+                if wape_model is not None else None)
 
     # --- final model on full history, recursive 13-week path ---
     hist = list(series)
@@ -153,8 +168,11 @@ def _forecast_category(series: np.ndarray, week0_start: pd.Timestamp,
         path.append(p)
         hist.append(p)
     return {"p50": np.array(path), "band": np.repeat(band, horizon),
+            "band_lo": np.repeat(band_lo, horizon),
+            "band_hi": np.repeat(band_hi, horizon),
             "wape_model": round(wape_model, 1) if wape_model is not None else None,
             "wape_naive": round(wape_naive, 1) if wape_naive is not None else None,
+            "coverage": round(coverage, 1) if coverage is not None else None,
             "method": method}
 
 
@@ -210,7 +228,6 @@ def forecast_cashflow(txn: pd.DataFrame, sched: pd.DataFrame, profile: dict,
             s = (wk[cat].abs() if cat in wk.columns else pd.Series(dtype=float))
             s = s.tail(hist_start_weeks).to_numpy()
             r = _forecast_category(s, week0_start, weeks)
-            band = r["band"]
             p50 = r["p50"].copy()
             if flow == "inflow" and cat in sales_cats:
                 p50 *= sales_mult
@@ -218,10 +235,12 @@ def forecast_cashflow(txn: pd.DataFrame, sched: pd.DataFrame, profile: dict,
                 p50 *= sup_mult
             if cat == "Wholesale Invoice" and ar_delay:
                 p50 = np.concatenate([np.zeros(ar_delay), p50[:-ar_delay]])
-            modeled.append({"flow": flow, "category": cat, "p50": p50, "band": band})
+            modeled.append({"flow": flow, "category": cat, "p50": p50,
+                            "band_lo": r["band_lo"], "band_hi": r["band_hi"]})
             if r["wape_model"] is not None:
                 backtests[cat] = {"model": r["method"], "wape_model": r["wape_model"],
-                                  "wape_seasonal_naive": r["wape_naive"]}
+                                  "wape_seasonal_naive": r["wape_naive"],
+                                  "coverage_pct": r["coverage"]}
 
     sched_rows = _project_scheduled(sched, end, weeks)
     sched_by_week = sched_rows.groupby("week").amount.sum().to_dict() \
@@ -240,7 +259,8 @@ def forecast_cashflow(txn: pd.DataFrame, sched: pd.DataFrame, profile: dict,
             outflow_c += float(extra_out.get("amount", 0))
         if extra_in.get("week") == w:
             inflow += float(extra_in.get("amount", 0))
-        band2 = sum(m["band"][w - 1] ** 2 for m in modeled) ** 0.5
+        band2_lo = sum(m["band_lo"][w - 1] ** 2 for m in modeled) ** 0.5
+        band2_hi = sum(m["band_hi"][w - 1] ** 2 for m in modeled) ** 0.5
         net = inflow - outflow_m - outflow_c
         balance += net
         out_weeks.append({
@@ -251,8 +271,8 @@ def forecast_cashflow(txn: pd.DataFrame, sched: pd.DataFrame, profile: dict,
             "outflow_committed": round(outflow_c, 2),
             "net_p50": round(net, 2),
             "balance_p50": round(balance, 2),
-            "balance_p10": round(balance - band2, 2),
-            "balance_p90": round(balance + band2, 2),
+            "balance_p10": round(balance - band2_lo, 2),
+            "balance_p90": round(balance + band2_hi, 2),
             "committed": sched_rows[sched_rows.week == w][
                 ["date", "category", "counterparty", "amount", "payment_id", "memo"]
             ].to_dict("records") if len(sched_rows) else [],

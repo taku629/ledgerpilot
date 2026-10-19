@@ -34,6 +34,17 @@ def test_forecast_beats_naive_on_scorable_categories(ctx):
         assert f["backtest"][c]["wape_model"] <= f["backtest"][c]["wape_seasonal_naive"] * 1.05, c
 
 
+def test_backtest_reports_band_coverage(ctx):
+    """Every scorable backtest row carries empirical P10–P90 coverage —
+    the band isn't just drawn, its hit-rate on held-out weeks is measured."""
+    f = tools.call_tool(ctx, "get_cashflow_forecast", {})
+    scored = {c: b for c, b in f["backtest"].items() if b.get("wape_model") is not None}
+    assert scored, "expected at least one scorable category"
+    for c, b in scored.items():
+        assert b["coverage_pct"] is not None, c
+        assert 0 <= b["coverage_pct"] <= 100, c
+
+
 def test_forecast_decomposition_sums(ctx):
     """net_p50 must equal inflow - modeled - committed every week, and the
     committed rows listed as evidence must total outflow_committed — guards

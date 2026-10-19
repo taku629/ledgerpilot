@@ -139,6 +139,19 @@ def test_regenerate_preserves_audit_trail():
     assert any(e.get("kind") == "data_regenerated" for e in rows)
 
 
+def test_audit_jsonl_export():
+    """Evidence download: /api/audit?format=jsonl streams NDJSON that
+    parses line-by-line — same events as the JSON view."""
+    r = client.get("/api/audit?format=jsonl&n=500")
+    assert r.status_code == 200
+    assert r.headers["content-type"].startswith("application/x-ndjson")
+    assert "attachment" in r.headers["content-disposition"]
+    lines = [ln for ln in r.text.splitlines() if ln.strip()]
+    import json as _json
+    events = [_json.loads(ln) for ln in lines]
+    assert events and all("kind" in e for e in events)
+
+
 def test_rate_limit_trips_after_burst():
     from app.main import chat_limiter
     chat_limiter._buckets.clear()

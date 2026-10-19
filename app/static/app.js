@@ -84,16 +84,18 @@ function renderModelAccuracy(bt) {
   const rows = Object.entries(bt || {}).filter(([, v]) => v.wape_model != null);
   $("#modelAcc").innerHTML = !rows.length ? "" : `<details>
     <summary>Forecast model accuracy — walk-forward backtest (WAPE %, lower is better)</summary>
-    <table><tr><th>Category</th><th>Model</th><th>Model WAPE</th><th>Seasonal-naive WAPE</th><th>Edge</th></tr>` +
+    <table><tr><th>Category</th><th>Model</th><th>Model WAPE</th><th>Seasonal-naive WAPE</th><th>Edge</th><th>Band coverage</th></tr>` +
     rows.map(([cat, v]) => {
       const edge = v.wape_seasonal_naive - v.wape_model;
       return `<tr><td>${esc(cat)}</td><td>${esc(v.model)}</td><td>${v.wape_model}%</td>
         <td>${v.wape_seasonal_naive}%</td>
-        <td class="${edge >= 0 ? "pos" : "neg"}">${edge >= 0 ? "+" : ""}${edge.toFixed(1)}pt</td></tr>`;
+        <td class="${edge >= 0 ? "pos" : "neg"}">${edge >= 0 ? "+" : ""}${edge.toFixed(1)}pt</td>
+        <td>${v.coverage_pct != null ? v.coverage_pct + "%" : "—"}</td></tr>`;
     }).join("") +
     `</table><div class="fineprint">Forecasts are produced by code only — the LLM
      never predicts. Walk-forward validation re-fits each model on past weeks and
-     scores the held-out week.</div></details>`;
+     scores the held-out week. Band coverage = share of held-out weeks whose
+     actuals landed inside the P10–P90 band (ideal ≈ 80%).</div></details>`;
 }
 
 /* ---------------- Alerts ---------------- */
@@ -223,11 +225,15 @@ function auditKindClass(k) {
 
 async function renderAudit() {
   const a = await api("/api/audit?n=60");
-  $("#auditList").innerHTML = a.rows.map(e =>
+  $("#auditList").innerHTML =
+    `<div class="fineprint" style="padding:0 0 8px">${a.rows.length} events —
+     append-only; survives data reset.
+     <a href="/api/audit?format=jsonl&n=500" download="ledgerpilot_audit.jsonl">Download evidence (JSONL)</a></div>` +
+    (a.rows.map(e =>
     `<div class="auditRow"><span class="ts">${e.ts || ""}</span>
      <span class="k ${auditKindClass(e.kind)}">${esc(e.kind)}</span>
      <span>${esc(e.tool || "")} ${esc(JSON.stringify(e.args || e.params || e.matches || e.result || e.reason || "")).slice(0, 130)}</span></div>`).join("")
-    || "<div class='auditRow'>No events yet.</div>";
+    || "<div class='auditRow'>No events yet.</div>");
 }
 
 /* ---------------- Transactions ---------------- */

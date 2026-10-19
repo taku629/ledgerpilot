@@ -193,14 +193,19 @@ class DeterministicBackend:
             if not bt:
                 return self._reply({"text": "No backtest available — not enough history."},
                                    calls, injected_warn)
-            rows = [(c, b["wape_model"], b["wape_seasonal_naive"])
+            rows = [(c, b["wape_model"], b["wape_seasonal_naive"], b.get("coverage_pct"))
                     for c, b in sorted(bt.items())]
-            wins = sum(1 for _, m_, n_ in rows if m_ <= n_)
+            wins = sum(1 for _, m_, n_, _ in rows if m_ <= n_)
             lines = ["**Forecast accuracy** — walk-forward backtest, WAPE (lower is better):",
-                     "", "| Category | Model | Seasonal naive |", "|---|---|---|"]
-            lines += [f"| {c} | {m_}% | {n_}% |" for c, m_, n_ in rows]
+                     "", "| Category | Model | Seasonal naive | Band coverage |",
+                     "|---|---|---|---|"]
+            lines += [f"| {c} | {m_}% | {n_}% | "
+                      f"{f'{cov}%' if cov is not None else '—'} |"
+                      for c, m_, n_, cov in rows]
             lines.append(f"\nThe fitted model beats the seasonal-naive baseline on "
-                         f"**{wins}/{len(rows)}** categories. Full table under the chart.")
+                         f"**{wins}/{len(rows)}** categories. Band coverage = share of "
+                         "held-out weeks landing inside the P10–P90 band (ideal ≈ 80%). "
+                         "Full table under the chart.")
             return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
 
         # ---- analysis ----

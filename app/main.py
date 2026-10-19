@@ -1,11 +1,13 @@
 """LedgerPilot API + static UI."""
 from __future__ import annotations
 
+import json
+
 import math
 from pathlib import Path
 
 from fastapi import FastAPI, HTTPException, Query, Request
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -188,7 +190,6 @@ def transactions(months: int = Query(3, ge=1, le=24),
 
 
 def json_dump(o):
-    import json
     return json.dumps(o, default=str)
 
 
@@ -198,7 +199,15 @@ def invoices():
 
 
 @app.get("/api/audit")
-def audit_tail(n: int = Query(60, ge=1, le=500)):
+def audit_tail(n: int = Query(60, ge=1, le=500),
+               format: str = Query("json", pattern="^(json|jsonl)$")):
+    if format == "jsonl":
+        lines = "".join(json.dumps(e, ensure_ascii=False) + "\n"
+                        for e in audit.tail(n))
+        return PlainTextResponse(
+            lines, media_type="application/x-ndjson",
+            headers={"Content-Disposition":
+                     'attachment; filename="ledgerpilot_audit.jsonl"'})
     return {"rows": audit.tail(n)}
 
 
