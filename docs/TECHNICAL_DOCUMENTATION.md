@@ -186,6 +186,7 @@ All synthetic, generated deterministically by `app/data_gen.py`
 | `POST /api/chat` | agent turn (user text scanned for injection) | — |
 | `GET /api/forecast` | 13-week projection | T0 |
 | `GET /api/financing` | ranked + rejected financing vs current gap | T0 |
+| `GET /api/financing/memo` | deterministic markdown decision memo (download) | T0 |
 | `POST /api/whatif` | scenario recompute | T1 |
 | `POST /api/actions/{id}/approve` | consume approval → execute | T2 gate |
 | `POST /api/actions/{id}/reject` | reject proposal | T2 gate |

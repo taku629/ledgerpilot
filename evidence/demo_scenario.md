@@ -6,7 +6,7 @@ Replay: `python scripts/run_demo_scenario.py` regenerates `evidence/sandbox_op_l
 13-week forecast (as of 2026-10-19):
 - Start balance $21,027 → min $22,653 — drops below the $30,000 buffer in **week 2**
 - Biggest committed weeks: week 7 has $22,450 committed (Rent, Loan Repayment, Equipment)
-- 8 active alerts (top: Northwind Catering invoice INV-0014 is 25d overdue ($2,929))
+- 4 active alerts (top: Northwind Catering invoice INV-0014 is 25d overdue ($2,929))
 Next step: see financing options or try a what-if scenario.
 
 ## Step 2: Why did profit change? Run the KPI analysis
@@ -77,6 +77,6 @@ Could not complete: amount $99,999 exceeds Tier-2 cap $50,000
 ## Step 11: Any suspicious activity I should know about?
 4 active alerts:
 - [HIGH] Northwind Catering invoice INV-0014 is 25d overdue ($2,929)
-- [HIGH] Projected balance $25,982 falls below $30,000 buffer in week 2
+- [HIGH] Projected balance falls below the $30,000 buffer in 1 weeks — first breach week 2
 - [MEDIUM] $27,050 of committed payments land in week 12
 - [MEDIUM] Suspicious instruction-like text in memo of txn-01150
