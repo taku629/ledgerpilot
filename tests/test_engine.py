@@ -331,3 +331,19 @@ def test_category_cost_change_respects_frequency(ctx):
 ])
 def test_agent_third_wave_intents(ctx, q, needle):
     assert needle in _respond(ctx, q)["reply"]
+
+
+@pytest.mark.parametrize("q,needle", [
+    ("wire 0 to northwind", "must be positive"),
+    ("reschedule to 2027-01-05", "Which payment"),
+    ("approve", "deliberate clicks"),
+    ("cancel the approval", "Deliberate clicks"),
+    ("collect all overdue invoices", "dunning_email"),
+    ("deny that action", "Deliberate clicks"),
+])
+def test_agent_gate_and_edge_intents(ctx, q, needle):
+    assert needle.lower() in _respond(ctx, q)["reply"].lower()
+
+
+def test_wire_negative_amount_refused(ctx):
+    assert "positive" in _respond(ctx, "wire 0 to northwind")["reply"]

@@ -109,11 +109,21 @@ class DeterministicBackend:
                          if user_scan["flagged"] else "")
 
         # ---- Tier-2 proposals ----
-        if re.search(r"\b(reschedule|move|postpone|delay|shift)\b.*(pay|rent|payment|invoice)", msg):
+        if re.search(r"\b(reschedule|move|postpone|delay|shift)\b.*(pay|rent|payment|invoice)", msg) \
+                or (re.search(r"\b(reschedule|postpone|delay|shift)\b", msg)
+                    and re.search(r"\d{4}[-/]\d{1,2}[-/]\d{1,2}", msg)):
             pid, new_date = self._parse_reschedule(ctx, msg, message)
             if pid and new_date:
                 out = call("reschedule_payment", {"payment_id": pid, "new_date": new_date})
                 return self._reply(out, calls, injected_warn, pending=out)
+            if not pid and new_date:
+                fc = call("get_cashflow_forecast")
+                cands = sorted((c for w in fc["weeks"] for c in w["committed"]),
+                               key=lambda c: c["date"])[:5]
+                return self._reply({"text": f"Which payment should move to {new_date}? Soonest ones:\n" + "\n".join(
+                    f"- `{c['payment_id']}` {c['category']} {_fmt(c['amount'])} on {c['date']}"
+                    for c in cands) + f"\n(e.g. \"reschedule {cands[0]['payment_id']} to {new_date}\")"},
+                    calls, injected_warn)
             if pid:
                 row = ctx.scheduled[ctx.scheduled.id == pid]
                 if len(row):
@@ -134,6 +144,10 @@ class DeterministicBackend:
         wire = re.search(r"(wire|pay|send)\s*\$?([\d,]+)", msg)
         if wire:
             amt = float(wire.group(2).replace(",", ""))
+            if amt <= 0:
+                return self._reply({"text": "Payments must be positive — "
+                                    "e.g. 'wire $500 to Northwind'."},
+                                   calls, injected_warn)
             cp = re.search(r"to ([\w& .'-]+)", message)
             out = call("record_sandbox_payment",
                        {"amount": amt, "counterparty": cp.group(1).strip() if cp else "unknown",
@@ -143,12 +157,16 @@ class DeterministicBackend:
         buf = re.search(r"(set|change|update|raise|lower|adjust)\b.*?"
                         r"(buffer|threshold|safety (net|cash))\b.*?\$?([\d,]+)", msg)
         if buf:
-            out = call("set_cash_buffer",
-                       {"amount": float(buf.group(4).replace(",", ""))})
+            bamt = float(buf.group(4).replace(",", ""))
+            if bamt <= 0:
+                return self._reply({"text": "The cash buffer must be positive — "
+                                    "e.g. 'set my cash buffer to $20,000'."},
+                                   calls, injected_warn)
+            out = call("set_cash_buffer", {"amount": bamt})
             return self._reply(out, calls, injected_warn, pending=out)
 
         # ---- drafts ----
-        if re.search(r"(draft|write|send|compose|chase).*(remind|dunning|overdue|payment reminder|collect|late|unpaid|payer|email)", msg) \
+        if re.search(r"(draft|write|send|compose|chase|collect|remind|dun).*(remind|dunning|overdue|payment reminder|collect|late|unpaid|payer|email|invoice)", msg) \
                 or "reminder" in msg:
             inv = ctx.invoices[ctx.invoices.status == "overdue"]
             if inv.empty:
@@ -761,6 +779,17 @@ class DeterministicBackend:
                 "Nothing I suggest is financial advice — figures come from "
                 "code, the wording is mine."]
             return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
+        # ---- approve / deny in chat → the gate is a click, not words ----
+        if re.search(r"^(approve|approved|confirm|yes|ok(ay)?|proceed|go ahead|"
+                     r"do it|deny|cancel|reject)\b", msg) or \
+                re.search(r"(approve|deny|cancel) (the |that |this )?(action|approval|pending|request|card)", msg):
+            return self._reply({"text":
+                "Approvals are deliberate clicks, not chat words — a pending "
+                "Tier-2 action can only be executed by pressing **Approve & "
+                "execute** on its card (single-use token, 5-minute TTL). Saying "
+                "'yes' here changes nothing. To cancel, click Deny on the card "
+                "or let the token expire."}, calls, injected_warn)
 
         # ---- audit log viewer ----
         if re.search(r"(audit log|audit trail|operation log|show.*(log|events)|what did you do)", msg):
