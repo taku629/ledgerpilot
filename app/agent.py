@@ -212,6 +212,29 @@ class DeterministicBackend:
                          "Full table under the chart.")
             return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
 
+        # ---- why is week N bad ----
+        wq = re.search(r"week\s*(\d+)", msg)
+        if wq and re.search(r"(why|bad|low|dip|drop|problem|happen|what)", msg):
+            wn = int(wq.group(1))
+            fc = call("get_cashflow_forecast")
+            w = next((x for x in fc["weeks"] if x["week"] == wn), None)
+            if w:
+                lines = [f"**Week {wn}** ({w['start']} → {w['end']}): "
+                         f"inflow {_fmt(w['inflow_p50'])}, outflow "
+                         f"{_fmt(w['outflow_modeled'] + w['outflow_committed'])} "
+                         f"→ balance {_fmt(w['balance_p50'])}",
+                         f"(P10–P90 {_fmt(w['balance_p10'])} → "
+                         f"{_fmt(w['balance_p90'])})"]
+                if w["committed"]:
+                    lines.append("Committed outflows landing that week:")
+                    lines += [f"- `{c['payment_id']}` {c['category']} "
+                              f"{_fmt(c['amount'])} ({c['counterparty']})"
+                              for c in w["committed"]]
+                else:
+                    lines.append("No committed payments — the dip is modeled "
+                                 "outflow (supplies, platform fees, payroll cadence).")
+                return self._reply({"text": "\n".join(lines)}, calls, injected_warn)
+
         # ---- analysis ----
         if re.search(r"(forecast|cash ?flow|runway|13.week|next.*weeks|projection)", msg):
             fc = call("get_cashflow_forecast")

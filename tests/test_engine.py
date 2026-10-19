@@ -287,6 +287,7 @@ def test_agent_judge_question_intents(ctx):
         ("when is rent due", "committed payments"),
         ("increase prices 10 percent", "sales_pct=10"),
         ("who are you", "LedgerPilot"),
+        ("why is week 8 so low", "Week 8"),
     ]
     for q, needle in checks:
         r = _respond(ctx, q)
