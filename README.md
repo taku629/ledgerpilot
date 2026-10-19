@@ -130,6 +130,7 @@ evidence/         sandbox op log (JSONL) produced by the demo scenario
 | 04 | Source + | this repo · `tests/` |
 | 05 | Security self-assessment | [docs/SECURITY_SELF_ASSESSMENT.md](docs/SECURITY_SELF_ASSESSMENT.md) |
 | 06 | Execution evidence | [evidence/sandbox_op_log.jsonl](evidence/sandbox_op_log.jsonl) + [evidence/demo_scenario.md](evidence/demo_scenario.md) |
+| — | **Judge guide (rubric → where)** | [docs/JUDGE_GUIDE.md](docs/JUDGE_GUIDE.md) |
 
 **Live demo:** https://ledgerpilot-vx59.onrender.com (free tier — cold start up to ~60 s)
 
