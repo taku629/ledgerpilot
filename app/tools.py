@@ -26,7 +26,7 @@ class BusinessContext:
 
     def __init__(self, data: dict, audit, approvals):
         self.txn = data["transactions"]
-        self.invoices = data["invoices"]
+        self.invoices = sandbox.apply_paid_invoices(data["invoices"])
         self.scheduled_raw = data["scheduled"]
         self.scheduled = sandbox.apply_reschedules(data["scheduled"])
         self.catalog = data["catalog"]
@@ -103,6 +103,9 @@ TOOL_DEFS = [
     {"name": "set_cash_buffer", "tier": TIER_SANDBOX,
      "description": "Change the low-balance alert threshold. Requires user approval.",
      "params": {"amount": "float"}},
+    {"name": "mark_invoice_paid", "tier": TIER_SANDBOX,
+     "description": "Record a customer payment against an open/overdue invoice (sandbox AR ledger). Requires user approval.",
+     "params": {"invoice_id": "str"}},
 ]
 
 
@@ -241,6 +244,22 @@ def call_tool(ctx: BusinessContext, name: str, args: dict,
                  "params": {"amount": float(a.get("amount", 0))},
                  "preview": f"Change low-balance threshold to "
                             f"${float(a.get('amount', 0)):,.0f}"})
+
+        if name == "mark_invoice_paid":
+            inv = ctx.invoices[ctx.invoices.id == a.get("invoice_id", "")]
+            if inv.empty:
+                return {"error": f"unknown invoice_id {a.get('invoice_id')}",
+                        "denied": True}
+            r = inv.iloc[0]
+            if str(r.status) == "paid":
+                return {"error": f"{a.get('invoice_id')} is already paid",
+                        "denied": True}
+            return ctx.approvals.create(
+                {"tool": "mark_invoice_paid",
+                 "params": {"invoice_id": a.get("invoice_id")},
+                 "preview": f"Mark {a.get('invoice_id')} "
+                            f"(${r.amount:,.0f}, {r.customer}, "
+                            f"due {r.due_date}) as paid in the AR ledger"})
     except ApprovalError as e:
         ctx.audit.record({"kind": "tool_denied", "tool": name,
                           "args": mask_pii(args), "reason": str(e),
@@ -278,6 +297,8 @@ def execute_approved(ctx: BusinessContext, action: dict) -> dict:
             ctx.profile["cash_buffer"] = float(p["amount"])
             ctx._forecast_cache.clear()
         return res
+    if name == "mark_invoice_paid":
+        return sandbox.exec_mark_invoice_paid(ctx.invoices, p["invoice_id"])
     return {"ok": False, "error": f"unknown action tool {name}"}
 
 

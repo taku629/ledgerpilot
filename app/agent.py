@@ -183,6 +183,26 @@ class DeterministicBackend:
             out = call("draft_loan_application", {"product_id": top["id"]})
             return self._reply(out, calls, injected_warn)
 
+        # ---- Tier-2: mark an invoice paid ----
+        if re.search(r"(mark|log|record|settle|close).*(paid|settled|received|reconcil)", msg) \
+                or re.search(r"(received|got|collected)\b.*(payment|paid|money).*(inv-|invoice)", msg) \
+                or re.search(r"inv-\d+.*(paid|settled|received)", msg):
+            open_inv = ctx.invoices[ctx.invoices.status != "paid"]
+            if open_inv.empty:
+                return self._reply({"text": "No open receivables — every invoice is already marked paid."},
+                                   calls, injected_warn)
+            named = re.search(r"inv-\d+", msg, re.I)
+            if named:
+                nid = named.group(0).upper()
+                known = ctx.invoices[ctx.invoices.id == nid]
+                if not known.empty and str(known.iloc[0].status) == "paid":
+                    return self._reply({"text": f"{nid} is already marked paid"
+                                                f" ({known.iloc[0].paid_date})."},
+                                       calls, injected_warn)
+            tgt = self._pick_invoice(open_inv, msg)
+            out = call("mark_invoice_paid", {"invoice_id": tgt})
+            return self._reply(out, calls, injected_warn, pending=out)
+
         # ---- category cost change: "what if rent goes up 15%" ----
         catq = re.search(
             r"(rent|payroll|salary|staff|wages|loan|equipment|insurance|utilities|"
@@ -533,6 +553,18 @@ class DeterministicBackend:
                    f"{_fmt(abs(margin))} "
                    f"{'above' if margin >= 0 else 'below'} break-even "
                    f"({abs(margin) / be * 100:.0f}% {'cushion' if margin >= 0 else 'shortfall'}).")
+            return self._reply({"text": txt}, calls, injected_warn)
+
+        # ---- import / upload CSV ----
+        if re.search(r"(import|upload|load|bring|connect)\b.*(csv|statement|bank|data|file)", msg):
+            txt = ("Use the **Import bank CSV** button in the Data tab — your file "
+                   "is parsed, deduplicated, auto-categorized, PII-masked, and the "
+                   "forecast refits instantly (append, or 'replace ledger' to start "
+                   "over; the old ledger is backed up first).\n"
+                   "Columns accepted: `date`, `amount` (signed) or `credit`/`debit`, "
+                   "`counterparty` (or `description`/`memo`), optional `category`, `type`.\n"
+                   "Limits: 1 MB / 5,000 rows; memos are injection-scanned like the "
+                   "rest of the ledger.")
             return self._reply({"text": txt}, calls, injected_warn)
 
         # ---- export ----

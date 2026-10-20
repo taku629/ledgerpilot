@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
 from .agent import Agent
-from . import sandbox
+from . import ingest, sandbox
 from .config import DATA_DATE, DATA_DIR, DISCLAIMER, LLM_BASE_URL
 from .data_gen import generate, load_all
 from .security import (ApprovalError, ApprovalStore, AuditLog, RateLimiter,
@@ -267,6 +267,37 @@ def audit_verify():
     """Re-verify the hash chain over the append-only log — proves to judges
     the trail is tamper-evident, not just written."""
     return audit.verify()
+
+
+@app.post("/api/data/upload")
+async def upload_data(request: Request,
+                      mode: str = Query("append", pattern="^(append|replace)$")):
+    """Import a bank-statement CSV (text/csv or text/plain body).
+    Columns: date, amount (signed) or credit/debit, counterparty|description
+    [, category, type]. Capped at 1 MB / 5,000 rows; memos are PII-masked and
+    injection-scanned like any other ledger data."""
+    raw = await request.body()
+    try:
+        new = ingest.parse_bank_csv(raw)
+    except ingest.IngestError as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:
+        raise HTTPException(422, f"could not parse CSV: {e}")
+    import pandas as pd
+    prev_n = len(ctx.txn)
+    stats = ingest.merge_transactions(ctx.txn, new, mode, DATA_DIR)
+    ctx.txn = pd.read_csv(DATA_DIR / "transactions.csv", parse_dates=["date"])
+    fc = ctx.forecast()
+    audit.record({"kind": "data_uploaded", "mode": mode,
+                  "rows_parsed": len(new), "added": stats["added"],
+                  "skipped_duplicates": stats["skipped_duplicates"],
+                  "flagged_memos": len(stats["flagged_memos"]),
+                  "prev_rows": prev_n, "total": stats["total"]})
+    return {**stats,
+            "forecast": {"min_balance": fc["min_balance"],
+                         "gap_week": fc["gap_week"],
+                         "gap_amount": fc["gap_amount"]},
+            "backup": "transactions_backup.csv" if mode == "replace" else None}
 
 
 @app.post("/api/dev/regenerate")

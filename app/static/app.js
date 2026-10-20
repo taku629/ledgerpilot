@@ -412,6 +412,21 @@ document.querySelectorAll(".suggestions button").forEach(b =>
   b.onclick = () => send(b.dataset.q));
 $("#txnMonths").onchange = renderTxns;
 $("#txnFilter").oninput = () => renderTxns();
+$("#csvUpload").onclick = async () => {
+  const f = $("#csvFile").files[0];
+  if (!f) { $("#csvResult").textContent = "choose a .csv first"; return; }
+  $("#csvResult").textContent = "uploading…";
+  try {
+    const mode = $("#csvReplace").checked ? "replace" : "append";
+    const r = await api(`/api/data/upload?mode=${mode}`, {method: "POST",
+      headers: {"content-type": "text/csv"}, body: f});
+    $("#csvResult").innerHTML = `<b>${r.added}</b> rows added` +
+      (r.skipped_duplicates ? `, ${r.skipped_duplicates} dupes skipped` : "") +
+      (r.flagged_memos?.length ? `, <b class="neg">${r.flagged_memos.length} memos flagged</b>` : "") +
+      ` — span ${r.span.join(" → ")}; forecast min <b>${fmt(r.forecast.min_balance)}</b>`;
+    await refresh();
+  } catch (e) { $("#csvResult").innerHTML = `<span class="neg">${esc(e.message)}</span>`; }
+};
 
 async function refresh() {
   STATE = await api("/api/state");

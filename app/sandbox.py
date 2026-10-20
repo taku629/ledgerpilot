@@ -86,6 +86,40 @@ def exec_set_cash_buffer(amount: float) -> dict:
     return {"ok": True, "cash_buffer": float(amount)}
 
 
+def exec_mark_invoice_paid(invoices: pd.DataFrame, invoice_id: str) -> dict:
+    """Marks an open/overdue invoice as paid in the sandbox AR ledger."""
+    row = invoices[invoices.id == invoice_id]
+    if row.empty:
+        return {"ok": False, "error": f"unknown invoice {invoice_id}"}
+    r = row.iloc[0]
+    if str(r.status) == "paid":
+        return {"ok": False, "error": f"{invoice_id} is already paid"}
+    today = str(DATA_DATE or date.today())
+    idx = invoices.index[invoices.id == invoice_id][0]
+    invoices.loc[idx, "status"] = "paid"
+    invoices.loc[idx, "paid_date"] = today
+    s = _load_state()
+    s.setdefault("paid_invoices", {})[invoice_id] = today
+    entry = {"ts": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime()),
+             "kind": "invoice_paid", "invoice_id": invoice_id,
+             "amount": float(r.amount), "paid_date": today}
+    s["executed"].append(entry)
+    _save_state(s)
+    return {"ok": True, "recorded": entry,
+            "note": f"{invoice_id} marked paid — removed from open receivables"}
+
+
+def apply_paid_invoices(invoices: pd.DataFrame) -> pd.DataFrame:
+    """Replays sandbox-paid invoices onto a fresh invoice frame."""
+    paid = _load_state().get("paid_invoices", {})
+    for iid, d in paid.items():
+        m = invoices.index[invoices.id == iid]
+        if len(m):
+            invoices.loc[m, "status"] = "paid"
+            invoices.loc[m, "paid_date"] = d
+    return invoices
+
+
 def exec_record_sandbox_wire(params: dict) -> dict:
     """Simulated outbound payment. Recorded in the sandbox ledger only."""
     s = _load_state()
