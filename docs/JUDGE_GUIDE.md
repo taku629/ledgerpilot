@@ -1,7 +1,7 @@
 # Judge guide — where each rubric point lives
 
 LedgerPilot — SME Finance Copilot (Harbor & Bean Roasters, fictional café + EC store).
-Live: https://ledgerpilot-vx59.onrender.com · Repo: https://github.com/taku629/ledgerpilot
+Live: https://ledgerpilot-7k6f.onrender.com · Repo: https://github.com/taku629/ledgerpilot
 
 Fastest tour (≈4 min): ask **"What should I do first?"** in the chat — it computes a
 ranked action plan from live alerts + forecast, and each line names the next command.
