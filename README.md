@@ -125,7 +125,7 @@ evidence/         sandbox op log (JSONL) produced by the demo scenario
 | # | Deliverable | Path |
 |---|---|---|
 | 01 | Technical documentation | [docs/TECHNICAL_DOCUMENTATION.md](docs/TECHNICAL_DOCUMENTATION.md) |
-| 02 | Presentation deck (11 slides) | [docs/PRESENTATION_DECK.md](docs/PRESENTATION_DECK.md) · [HTML slideshow](docs/PRESENTATION_DECK.html) |
+| 02 | Presentation deck (16 slides) | [PPTX](docs/LedgerPilot_Deck.pptx) · [HTML preview](docs/PRESENTATION_DECK.html) · [outline](docs/PRESENTATION_DECK.md) |
 | 03 | Demo video script (≤5 min) | [docs/DEMO_VIDEO_SCRIPT.md](docs/DEMO_VIDEO_SCRIPT.md) |
 | 04 | Source + | this repo · `tests/` |
 | 05 | Security self-assessment | [docs/SECURITY_SELF_ASSESSMENT.md](docs/SECURITY_SELF_ASSESSMENT.md) |
