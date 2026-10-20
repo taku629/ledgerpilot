@@ -158,6 +158,8 @@ python -m pytest        # 111 tests — engine + security + injection defense + 
 - **No auth/login** — a demo deployment assumes a single owner session; the
   approval gate and audit trail are the security boundary being demonstrated.
 
+- **AI-assisted development** 
+— the team (HATA Takumu, AKIYAMA Mei) designed the system, wrote the requirements and reviewed every change; implementation was carried out with the Devin AI coding agent, which is why most commits are authored by `devin-ai-integration[bot]` with the team as co-author.
 ## Known risks
 
 Hallucinated numbers (mitigated by number-guard + tools-only figures), forecast
