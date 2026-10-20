@@ -56,10 +56,12 @@
           <label>Supplies <input type="range" id="wiSup" min="-20" max="50" value="0"><span id="wiSupV">0%</span></label>
           <label>AR delay <input type="range" id="wiAR" min="0" max="6" value="0"><span id="wiARV">0w</span></label>
           <button id="wiApply">Apply what-if</button>
+          <button id="wiPin" class="ghost" disabled>Pin as scenario</button>
           <button id="wiReset" class="ghost">Reset</button>
         </div>
       </div>
       <div class="chartWrap"><canvas id="cfChart"></canvas></div>
+      <div id="scenarioList"></div>
       <div id="gapNote"></div>
       <div id="modelAcc"></div>
     </div>

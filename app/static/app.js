@@ -30,6 +30,8 @@ const md = (s) => {
 };
 
 let STATE = null, chart = null, scenarioSeries = null;
+let pinnedScenarios = [], lastScenario = null;
+const SCENARIO_COLORS = ["#c792ff", "#ff9d6b", "#6bd0ff", "#f7e26b", "#ff6b9d"];
 
 async function api(path, opts) {
   const r = await fetch(path, opts);
@@ -79,8 +81,11 @@ function renderChart() {
     {label: "Committed outflow", data: committed, type: "bar",
      backgroundColor: "rgba(255,90,101,.45)", borderRadius: 4},
   ];
-  if (scenarioSeries) sets.push({label: "Scenario", data: scenarioSeries,
-    borderColor: "#c792ff", borderDash: [4, 4], borderWidth: 2, pointRadius: 0,
+  pinnedScenarios.forEach(s => sets.push({label: `Scenario ${s.name}`,
+    data: s.series, borderColor: s.color, borderDash: [2, 4], borderWidth: 2,
+    pointRadius: 0, type: "line", tension: .3}));
+  if (scenarioSeries) sets.push({label: "Scenario (live)", data: scenarioSeries,
+    borderColor: "#c792ff", borderDash: [6, 4], borderWidth: 2, pointRadius: 0,
     type: "line", tension: .3});
   if (chart) chart.destroy();
   chart = new Chart($("#cfChart"), {
@@ -391,11 +396,38 @@ async function applyWhatIf() {
   const r = await api("/api/whatif", {method: "POST",
     headers: {"content-type": "application/json"}, body: JSON.stringify(params)});
   scenarioSeries = r.forecast.weeks.map(w => w.balance_p50);
+  lastScenario = {params: r.params, series: scenarioSeries,
+                  min: r.forecast.min_balance, gap_week: r.forecast.gap_week};
+  $("#wiPin").disabled = false;
   renderChart();
   $("#gapNote").innerHTML = `Scenario ${JSON.stringify(r.params)} → min
     <b class="${r.forecast.min_balance < 0 ? "neg" : ""}">${fmt(r.forecast.min_balance)}</b>
     (baseline ${fmt(r.baseline.min_balance)}), first buffer breach
-    ${r.forecast.gap_week ? "week " + r.forecast.gap_week : "none"}.`;
+    ${r.forecast.gap_week ? "week " + r.forecast.gap_week : "none"}.
+    Pin it to compare with other scenarios.`;
+}
+
+function renderScenarioList() {
+  const el = $("#scenarioList");
+  if (!pinnedScenarios.length) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="scnHead">Pinned scenarios
+    <button class="ghost" id="scnClear" style="font-size:11px">clear all</button></div>
+    <table class="scnTable"><tr><th></th><th>Params</th><th>Min balance</th>
+    <th>vs baseline</th><th>First breach</th><th></th></tr>` +
+    pinnedScenarios.map((s, i) => {
+      const delta = s.min - STATE.forecast.min_balance;
+      const desc = Object.entries(s.params).filter(([, v]) => v)
+        .map(([k, v]) => `${k.replace(/_pct$/, "")} ${v > 0 ? "+" : ""}${v}${k.endsWith("_pct") ? "%" : "wk"}`).join(", ") || "baseline";
+      return `<tr><td><span class="scnDot" style="background:${s.color}"></span>${s.name}</td>
+        <td>${esc(desc)}</td><td>${fmt(s.min)}</td>
+        <td class="${delta < 0 ? "neg" : ""}">${delta >= 0 ? "+" : ""}${fmt(delta)}</td>
+        <td>${s.gap_week ? "week " + s.gap_week : "none"}</td>
+        <td><button class="ghost scnRm" data-i="${i}" style="font-size:11px">remove</button></td></tr>`;
+    }).join("") + `</table>`;
+  el.querySelectorAll(".scnRm").forEach(b => b.onclick = () => {
+    pinnedScenarios.splice(+b.dataset.i, 1); renderScenarioList(); renderChart(); });
+  el.querySelector("#scnClear").onclick = () => {
+    pinnedScenarios = []; renderScenarioList(); renderChart(); };
 }
 ["wiSales", "wiSup", "wiAR"].forEach(id =>
   $("#" + id).oninput = () => {
@@ -403,7 +435,16 @@ async function applyWhatIf() {
       id === "wiAR" ? $("#" + id).value + "w" : $("#" + id).value + "%";
   });
 $("#wiApply").onclick = applyWhatIf;
-$("#wiReset").onclick = () => { scenarioSeries = null;
+$("#wiPin").onclick = () => {
+  if (!lastScenario) return;
+  const name = String.fromCharCode(65 + pinnedScenarios.length);
+  pinnedScenarios.push({name, ...lastScenario,
+                        color: SCENARIO_COLORS[pinnedScenarios.length % SCENARIO_COLORS.length]});
+  $("#wiPin").disabled = true;
+  renderScenarioList(); renderChart();
+};
+$("#wiReset").onclick = () => { scenarioSeries = null; lastScenario = null;
+  $("#wiPin").disabled = true;
   ["wiSales", "wiSup"].forEach(id => { $("#" + id).value = 0; $("#" + id + "V").textContent = "0%"; });
   $("#wiAR").value = 0; $("#wiARV").textContent = "0w"; renderChart(); };
 
