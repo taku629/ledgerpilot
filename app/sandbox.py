@@ -120,6 +120,31 @@ def apply_paid_invoices(invoices: pd.DataFrame) -> pd.DataFrame:
     return invoices
 
 
+# ------------------------------------------------- named what-if scenarios
+MAX_SCENARIOS = 5
+
+
+def list_scenarios() -> dict:
+    return dict(_load_state().get("scenarios", {}))
+
+
+def save_scenario(name: str, params: dict) -> dict:
+    s = _load_state()
+    sc = s.setdefault("scenarios", {})
+    if name not in sc and len(sc) >= MAX_SCENARIOS:
+        raise ValueError(f"at most {MAX_SCENARIOS} saved scenarios — delete one first")
+    sc[name] = params
+    _save_state(s)
+    return sc
+
+
+def delete_scenario(name: str) -> bool:
+    s = _load_state()
+    existed = s.get("scenarios", {}).pop(name, None) is not None
+    _save_state(s)
+    return existed
+
+
 def exec_record_sandbox_wire(params: dict) -> dict:
     """Simulated outbound payment. Recorded in the sandbox ledger only."""
     s = _load_state()

@@ -30,7 +30,7 @@ const md = (s) => {
 };
 
 let STATE = null, chart = null, scenarioSeries = null;
-let pinnedScenarios = [], lastScenario = null;
+let savedScenarios = [], lastScenario = null;
 const SCENARIO_COLORS = ["#c792ff", "#ff9d6b", "#6bd0ff", "#f7e26b", "#ff6b9d"];
 
 async function api(path, opts) {
@@ -81,9 +81,9 @@ function renderChart() {
     {label: "Committed outflow", data: committed, type: "bar",
      backgroundColor: "rgba(255,90,101,.45)", borderRadius: 4},
   ];
-  pinnedScenarios.forEach(s => sets.push({label: `Scenario ${s.name}`,
-    data: s.series, borderColor: s.color, borderDash: [2, 4], borderWidth: 2,
-    pointRadius: 0, type: "line", tension: .3}));
+  savedScenarios.filter(s => s.name !== "baseline").forEach(s => sets.push({
+    label: `Scenario ${s.name}`, data: s.series, borderColor: s.color,
+    borderDash: [2, 4], borderWidth: 2, pointRadius: 0, type: "line", tension: .3}));
   if (scenarioSeries) sets.push({label: "Scenario (live)", data: scenarioSeries,
     borderColor: "#c792ff", borderDash: [6, 4], borderWidth: 2, pointRadius: 0,
     type: "line", tension: .3});
@@ -404,30 +404,53 @@ async function applyWhatIf() {
     <b class="${r.forecast.min_balance < 0 ? "neg" : ""}">${fmt(r.forecast.min_balance)}</b>
     (baseline ${fmt(r.baseline.min_balance)}), first buffer breach
     ${r.forecast.gap_week ? "week " + r.forecast.gap_week : "none"}.
-    Pin it to compare with other scenarios.`;
+    Save it as a named scenario (A, B…) to compare side by side.`;
+}
+
+function scenarioDesc(params) {
+  return Object.entries(params || {}).filter(([, v]) => v)
+    .map(([k, v]) => `${k.replace(/_pct$/, "").replace(/_weeks$/, "")} ${v > 0 ? "+" : ""}${v}${k.endsWith("_pct") ? "%" : "w"}`)
+    .join(", ") || "live forecast";
+}
+
+function nextScenarioName() {
+  const used = new Set(savedScenarios.map(s => s.name));
+  for (let i = 0; i < 26; i++) { const n = String.fromCharCode(65 + i); if (!used.has(n)) return n; }
+  return "S" + savedScenarios.length;
+}
+
+async function loadScenarios() {
+  const d = await api("/api/scenarios");
+  setScenarios(d);
+}
+
+function setScenarios(d) {
+  savedScenarios = d.scenarios.map((s, i) => ({...s,
+    color: s.name === "baseline" ? "#35d0a5" : SCENARIO_COLORS[(i - 1) % SCENARIO_COLORS.length]}));
+  $("#wiName").placeholder = `name (${nextScenarioName()})`;
+  renderScenarioList();
 }
 
 function renderScenarioList() {
   const el = $("#scenarioList");
-  if (!pinnedScenarios.length) { el.innerHTML = ""; return; }
-  el.innerHTML = `<div class="scnHead">Pinned scenarios
+  if (savedScenarios.length <= 1) { el.innerHTML = ""; return; }
+  el.innerHTML = `<div class="scnHead">Scenario comparison — saved server-side, re-priced live on the current ledger
     <button class="ghost" id="scnClear" style="font-size:11px">clear all</button></div>
-    <table class="scnTable"><tr><th></th><th>Params</th><th>Min balance</th>
-    <th>vs baseline</th><th>First breach</th><th></th></tr>` +
-    pinnedScenarios.map((s, i) => {
-      const delta = s.min - STATE.forecast.min_balance;
-      const desc = Object.entries(s.params).filter(([, v]) => v)
-        .map(([k, v]) => `${k.replace(/_pct$/, "")} ${v > 0 ? "+" : ""}${v}${k.endsWith("_pct") ? "%" : "wk"}`).join(", ") || "baseline";
-      return `<tr><td><span class="scnDot" style="background:${s.color}"></span>${s.name}</td>
-        <td>${esc(desc)}</td><td>${fmt(s.min)}</td>
-        <td class="${delta < 0 ? "neg" : ""}">${delta >= 0 ? "+" : ""}${fmt(delta)}</td>
-        <td>${s.gap_week ? "week " + s.gap_week : "none"}</td>
-        <td><button class="ghost scnRm" data-i="${i}" style="font-size:11px">remove</button></td></tr>`;
-    }).join("") + `</table>`;
-  el.querySelectorAll(".scnRm").forEach(b => b.onclick = () => {
-    pinnedScenarios.splice(+b.dataset.i, 1); renderScenarioList(); renderChart(); });
-  el.querySelector("#scnClear").onclick = () => {
-    pinnedScenarios = []; renderScenarioList(); renderChart(); };
+    <table class="scnTable"><tr><th>Scenario</th><th>Params</th><th>Min balance</th>
+    <th>vs baseline</th><th>First breach</th><th>Week-13 balance</th><th></th></tr>` +
+    savedScenarios.map(s => `<tr><td><span class="scnDot" style="background:${s.color}"></span><b>${esc(s.name)}</b></td>
+        <td>${esc(scenarioDesc(s.params))}</td><td class="${s.min_balance < 0 ? "neg" : ""}">${fmt(s.min_balance)}</td>
+        <td class="${s.delta_vs_baseline < 0 ? "neg" : ""}">${s.delta_vs_baseline >= 0 ? "+" : "-"}${fmt(Math.abs(s.delta_vs_baseline))}</td>
+        <td>${s.gap_week ? "week " + s.gap_week : "none"}</td><td>${fmt(s.end_balance)}</td>
+        <td>${s.name === "baseline" ? "" : `<button class="ghost scnRm" data-n="${esc(s.name)}" style="font-size:11px">remove</button>`}</td></tr>`).join("") +
+    `</table>`;
+  el.querySelectorAll(".scnRm").forEach(b => b.onclick = async () => {
+    setScenarios(await api(`/api/scenarios/${encodeURIComponent(b.dataset.n)}`, {method: "DELETE"}));
+    renderChart(); });
+  el.querySelector("#scnClear").onclick = async () => {
+    for (const s of savedScenarios.filter(x => x.name !== "baseline"))
+      await api(`/api/scenarios/${encodeURIComponent(s.name)}`, {method: "DELETE"});
+    await loadScenarios(); renderChart(); };
 }
 ["wiSales", "wiSup", "wiAR"].forEach(id =>
   $("#" + id).oninput = () => {
@@ -435,13 +458,18 @@ function renderScenarioList() {
       id === "wiAR" ? $("#" + id).value + "w" : $("#" + id).value + "%";
   });
 $("#wiApply").onclick = applyWhatIf;
-$("#wiPin").onclick = () => {
+$("#wiPin").onclick = async () => {
   if (!lastScenario) return;
-  const name = String.fromCharCode(65 + pinnedScenarios.length);
-  pinnedScenarios.push({name, ...lastScenario,
-                        color: SCENARIO_COLORS[pinnedScenarios.length % SCENARIO_COLORS.length]});
-  $("#wiPin").disabled = true;
-  renderScenarioList(); renderChart();
+  const name = ($("#wiName").value.trim() || nextScenarioName()).slice(0, 24);
+  try {
+    setScenarios(await api("/api/scenarios", {method: "POST",
+      headers: {"content-type": "application/json"},
+      body: JSON.stringify({name, params: lastScenario.params})}));
+    $("#wiName").value = "";
+    $("#wiPin").disabled = true;
+    scenarioSeries = null;
+    renderChart();
+  } catch (e) { $("#gapNote").innerHTML = `<span class="neg">${esc(e.message)}</span>`; }
 };
 $("#wiReset").onclick = () => { scenarioSeries = null; lastScenario = null;
   $("#wiPin").disabled = true;
@@ -453,25 +481,99 @@ document.querySelectorAll(".suggestions button").forEach(b =>
   b.onclick = () => send(b.dataset.q));
 $("#txnMonths").onchange = renderTxns;
 $("#txnFilter").oninput = () => renderTxns();
+const CSV_FIELDS = ["date", "amount", "credit", "debit", "description", "type", "category"];
+let csvPreview = null;
+
+function csvMappingQuery() {
+  const q = new URLSearchParams();
+  document.querySelectorAll("#csvMap select").forEach(sel =>
+    q.set(sel.dataset.f + "_col", sel.value || "-"));
+  return q.toString();
+}
+
+async function previewCsv(useMapping) {
+  const f = $("#csvFile").files[0];
+  if (!f) return;
+  $("#csvResult").textContent = "reading…";
+  try {
+    const qs = useMapping ? "?" + csvMappingQuery() : "";
+    csvPreview = await api("/api/data/preview" + qs, {method: "POST",
+      headers: {"content-type": "text/csv"}, body: f});
+    renderCsvPreview();
+  } catch (e) {
+    csvPreview = null; $("#csvMap").innerHTML = ""; $("#csvUpload").disabled = true;
+    $("#csvResult").innerHTML = `<span class="neg">${esc(e.message)}</span>`;
+  }
+}
+
+function renderCsvPreview() {
+  const p = csvPreview;
+  const opts = (cur) => `<option value="">— none —</option>` + p.columns.map(c =>
+    `<option value="${esc(c)}" ${c === cur ? "selected" : ""}>${esc(c)}</option>`).join("");
+  $("#csvMap").innerHTML = `<div class="fineprint" style="margin:6px 0">Step 2 — column mapping
+      (${p.rows} rows; limits ${p.limits.max_rows.toLocaleString()} rows / ${(p.limits.max_bytes / 1e6).toFixed(0)} MB).
+      Auto-detected; change any column and the preview re-runs.</div>
+    <div class="csvMapGrid">` + CSV_FIELDS.map(fld => `<label>${fld}
+      <select data-f="${fld}">${opts(p.mapping[fld])}</select></label>`).join("") + `</div>` +
+    (p.ok ? `<div class="fineprint" style="margin:8px 0 4px">Step 3 — classification preview
+        (${p.valid_rows} valid${p.dropped_rows ? `, ${p.dropped_rows} dropped` : ""}; in ${fmt(p.inflow_total)}, out ${fmt(p.outflow_total)};
+        span ${p.span.join(" → ")}; PII masked${p.flagged_memos.length ? `; <b class="neg">${p.flagged_memos.length} memo(s) flagged</b>` : ""})</div>
+      <table><tr><th>Date</th><th>Category</th><th>Counterparty (masked)</th><th>Amount</th></tr>` +
+      p.sample.map(r => `<tr><td>${r.date}</td><td>${esc(r.category)}</td><td>${esc(r.counterparty)}</td>
+        <td class="${r.flow === "outflow" ? "neg" : "pos"}">${r.flow === "outflow" ? "-" : "+"}${fmt(r.amount)}</td></tr>`).join("") +
+      `</table><div class="fineprint" style="margin-top:4px">By category: ` +
+      p.categories.slice(0, 8).map(c => `${esc(c.category)} ${c.flow === "outflow" ? "-" : "+"}${fmt(c.total)} (${c.count})`).join(" · ") + `</div>`
+      : `<div class="neg" style="margin:6px 0">${esc(p.error)}</div>`);
+  $("#csvMap").querySelectorAll("select").forEach(sel => sel.onchange = () => previewCsv(true));
+  $("#csvUpload").disabled = !p.ok;
+  $("#csvResult").textContent = p.ok ? "Step 4 — Import to refit the forecast" : "fix the mapping to continue";
+}
+
+$("#csvFile").onchange = () => previewCsv(false);
 $("#csvUpload").onclick = async () => {
   const f = $("#csvFile").files[0];
-  if (!f) { $("#csvResult").textContent = "choose a .csv first"; return; }
-  $("#csvResult").textContent = "uploading…";
+  if (!f || !csvPreview?.ok) { $("#csvResult").textContent = "choose a .csv first"; return; }
+  $("#csvResult").textContent = "importing…";
   try {
     const mode = $("#csvReplace").checked ? "replace" : "append";
-    const r = await api(`/api/data/upload?mode=${mode}`, {method: "POST",
+    const r = await api(`/api/data/upload?mode=${mode}&${csvMappingQuery()}`, {method: "POST",
       headers: {"content-type": "text/csv"}, body: f});
     $("#csvResult").innerHTML = `<b>${r.added}</b> rows added` +
       (r.skipped_duplicates ? `, ${r.skipped_duplicates} dupes skipped` : "") +
       (r.flagged_memos?.length ? `, <b class="neg">${r.flagged_memos.length} memos flagged</b>` : "") +
-      ` — span ${r.span.join(" → ")}; forecast min <b>${fmt(r.forecast.min_balance)}</b>`;
-    await refresh();
+      ` — forecast refit: min <b>${fmt(r.forecast_before.min_balance)} → ${fmt(r.forecast.min_balance)}</b>,
+        balance ${fmt(r.forecast_before.current_balance)} → ${fmt(r.forecast.current_balance)}`;
+    $("#csvMap").innerHTML = ""; csvPreview = null; $("#csvUpload").disabled = true;
+    await refresh(); renderTxns();
   } catch (e) { $("#csvResult").innerHTML = `<span class="neg">${esc(e.message)}</span>`; }
 };
 
+$("#demoReset").onclick = async () => {
+  $("#csvResult").textContent = "resetting…";
+  await api("/api/dev/regenerate", {method: "POST"});
+  $("#csvMap").innerHTML = ""; csvPreview = null; $("#csvUpload").disabled = true;
+  $("#csvResult").textContent = "demo ledger, invoices and scenarios reset (audit trail kept)";
+  await refresh(); renderTxns();
+};
+
+/* ---------------- Receivables ---------------- */
+async function renderReceivables() {
+  const inv = (await api("/api/invoices")).rows.filter(r => r.status !== "paid");
+  $("#arTable").innerHTML = inv.length
+    ? `<table><tr><th>Invoice</th><th>Customer</th><th>Due</th><th>Amount</th><th>Status</th><th></th></tr>` +
+      inv.map(r => `<tr><td><code>${esc(r.id)}</code></td><td>${esc(r.customer)}</td><td>${r.due_date}</td>
+        <td>${fmt(r.amount)}</td><td class="${r.status === "overdue" ? "neg" : ""}">${esc(r.status)}</td>
+        <td><button class="ghost arPaid" data-id="${esc(r.id)}" style="font-size:11px">Mark paid…</button></td></tr>`).join("") + "</table>"
+    : `<div class="fineprint">No open receivables — every invoice is paid.</div>`;
+  $("#arTable").querySelectorAll(".arPaid").forEach(b =>
+    b.onclick = () => send(`mark ${b.dataset.id} paid`));
+}
+
 async function refresh() {
   STATE = await api("/api/state");
+  await loadScenarios().catch(() => {});
   renderKpis(); renderChart(); renderAlerts(); renderAnalysis(); renderScheduled();
+  renderReceivables();
 }
 
 (async function init() {

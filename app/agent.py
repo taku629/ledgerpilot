@@ -21,6 +21,7 @@ from datetime import date, timedelta
 import httpx
 import pandas as pd
 
+from . import sandbox
 from . import tools as tools_mod
 from .config import (DATA_DATE, DISCLAIMER, LLM_API_KEY, LLM_BASE_URL, LLM_MODEL)
 from .security import TIER_DRAFT, TIER_SANDBOX, scan_for_injection
@@ -273,6 +274,35 @@ class DeterministicBackend:
                                  "e.g. 'what if rent goes up 15%'.")
                 return self._reply({"text": "Cost increase impact:\n" + "\n".join(lines)},
                                    calls, injected_warn)
+
+        # ---- saved scenario comparison ----
+        if re.search(r"(compare|list|show|my|saved|pinned)\b.*scenarios?\b", msg) \
+                and not re.search(r"\d+\s*%", msg):
+            saved = sandbox.list_scenarios()
+            base = ctx.forecast()
+            if not saved:
+                return self._reply({"text": "No saved scenarios yet. Apply a what-if on the "
+                                            "chart and click **Save as scenario** (e.g. name it "
+                                            "A or B), then ask me to compare."},
+                                   calls, injected_warn)
+            rows = [("baseline", {}, base)]
+            for n, p in saved.items():
+                rows.append((n, p, call("what_if", p) if p else base))
+            lines = ["| Scenario | Params | Min balance | vs baseline | First breach |",
+                     "|---|---|--:|--:|--:|"]
+            for n, p, fc in rows:
+                desc = ", ".join(f"{k}={v}" for k, v in p.items()) or "live forecast"
+                d = fc["min_balance"] - base["min_balance"]
+                lines.append(f"| {n} | {desc} | {_fmt(fc['min_balance'])} | "
+                             f"{'+' if d >= 0 else '-'}{_fmt(abs(d))} | "
+                             f"{('week ' + str(fc['gap_week'])) if fc['gap_week'] else 'none'} |")
+            best = max(rows[1:], key=lambda r: r[2]["min_balance"])
+            worst = min(rows[1:], key=lambda r: r[2]["min_balance"])
+            txt = ("Scenario comparison (13-week P50, re-priced on the live ledger):\n"
+                   + "\n".join(lines)
+                   + f"\n\nHighest floor: **{best[0]}** ({_fmt(best[2]['min_balance'])}); "
+                     f"lowest: **{worst[0]}** ({_fmt(worst[2]['min_balance'])}).")
+            return self._reply({"text": txt}, calls, injected_warn)
 
         # ---- what-if ----
         wi = re.search(r"(what[- ]?if|if .* (drop|fall|decline|grow|rise|increase|decrease)|scenario)", msg) \

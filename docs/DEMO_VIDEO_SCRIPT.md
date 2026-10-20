@@ -81,12 +81,15 @@ drivers table.
 > "What if sales drop twenty percent? The scenario recomputes instantly —
 > the purple line is the new projection, the buffer breach moves earlier."
 
-**Do:** Click **Pin as scenario** — the line stays named *Scenario A*.
-Drag **AR delay** to +4w → Apply → **Pin** again → *Scenario B* appears
-in the compare table with min balance, delta vs baseline, first breach.
+**Do:** Click **Save as scenario** (name defaults to *A*). Reset the Sales
+slider, drag **AR delay** to +4w → Apply → **Save as scenario** → *B*.
+The compare table now shows **baseline / A / B**: min balance, delta vs
+baseline, first breach, week-13 balance. Type **`compare my scenarios`** in
+chat — the same table comes back from the agent.
 
-> "Each what-if can be pinned and compared — three strategies side by side
-> on one chart, priced by the engine, not narrated."
+> "Each what-if can be saved as a named scenario — baseline, A and B side
+> by side on one chart, priced by the engine, not narrated. They're stored
+> server-side and re-priced live, so they move when the data moves."
 
 **Do:** Reset. Then in chat type **`what happens if rent goes up 15%`**.
 
@@ -111,6 +114,29 @@ in the compare table with min balance, delta vs baseline, first breach.
 > server refuses it. Every step is in the audit log, PII-masked — and
 > hash-chained: the Audit tab verifies the chain live, so a tampered
 > record can't hide."
+
+**Do (optional, +20 s):** Click the **Mark INV-0014 paid** chip → approval
+card → **Approve**. Open the **Transactions** tab: INV-0014 is gone from
+*Open receivables*; the overdue KPI drops to $0.
+
+> "The fourth executable action: recording a customer payment. Same gate —
+> nothing leaves accounts receivable until the owner approves."
+
+## Scene 6b — Bank CSV import (optional, +30 s)
+
+**Do:** Transactions tab → **Import bank CSV** → choose a statement file
+with headers like `Posted Date, Payee, Withdrawals, Deposits`. The mapping
+step auto-detects the columns (dropdowns let you override any of them) and
+shows a classification preview: Rent, Revenue, Coffee & Supplies — with
+`[EMAIL]` masked. Click **Import**.
+
+> "Real data in: upload a bank CSV, confirm the column mapping, see how
+> each row will be classified — emails and card numbers masked before
+> storage — then import. The forecast refits on the spot: minimum balance
+> before and after, right there. Oversized, binary or malformed files are
+> rejected with a reason."
+
+**Do:** Click **Reset demo data** to return to the scripted numbers.
 
 ## Scene 7 — Injection defense (3:50–4:25)
 
