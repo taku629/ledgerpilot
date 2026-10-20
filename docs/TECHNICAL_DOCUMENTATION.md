@@ -31,11 +31,12 @@ enforces, and the owner approves**.
 │   ├─ DeterministicBackend  intent parser → same tools → templated replies        │
 │   └─ number_guard      every ≥$10 figure in a reply must appear in tool output   │
 │                                                                                  │
-│  Tool surface (app/tools.py) — 12 tools, tier-checked server-side                │
+│  Tool surface (app/tools.py) — 13 tools, tier-checked server-side                │
 │   T0 read:   load_transactions · get_cashflow_forecast · get_kpis                │
 │              get_alerts · match_financing · get_evidence                          │
 │   T1 draft:  what_if · draft_dunning_email · draft_loan_application               │
 │   T2 sandbox:reschedule_payment · record_sandbox_payment · set_cash_buffer        │
+│              · mark_invoice_paid                                                  │
 │              → returns a PENDING ACTION; never executes here                      │
 │   T3 real:   (registered, permanently disabled — check_tier refuses)             │
 │                                                                                  │
@@ -50,6 +51,7 @@ enforces, and the owner approves**.
 │   alerts.py       low balance / cluster / overdue AR / injection / outlier        │
 │   financing.py    eligibility + cost + coverage/speed/burden scoring              │
 │   sandbox.py      simulated ledger writes + draft generators                     │
+│   ingest.py       bank-CSV parser (aliases, encodings, dup check, PII mask)      │
 │   security.py     tiers, injection scanner, PII masking, approvals, audit        │
 │   data_gen.py     seeded synthetic dataset (deterministic)                        │
 └──────────────────────────────────────────────────────────────────────────────────┘
@@ -125,6 +127,23 @@ Every row reports estimated total cost and monthly payment; **rejected
 products stay visible with their reasons** ("too slow: 14d vs gap in week 2")
 — transparency is part of the rubric, not an afterthought.
 
+### 2.4a Bank-CSV ingest (`app/ingest.py`)
+
+`POST /api/data/upload` accepts a raw bank statement CSV and merges it into
+the transaction ledger:
+
+- **Robust parse** — utf-8-sig → cp932 fallback, column aliases
+  (date/posted/value_date…; amount/balance/金額…; separate credit/debit
+  columns supported), `$`/`¥` stripping, ISO-ish and `YYYY/M/D` dates,
+  >10% unparseable dates or >1 MB / >5,000 rows → HTTP 422.
+- **Safety** — counterparty free-text is PII-masked before storage; up to
+  500 memo fields per file are run through the injection scanner and
+  flagged hits are returned in the response.
+- **Merge modes** — `append` dedupes on (date, amount, counterparty);
+  `replace` snapshots the old ledger to `transactions_backup.csv` first.
+- After a merge the in-memory ledger is reloaded so forecasts/KPIs recompute
+  on the new data.
+
 ### 2.4 Agent (`app/agent.py`)
 
 - **LLM mode** — OpenAI-compatible `chat.completions` with the 12 tool specs;
@@ -176,7 +195,7 @@ report. The five layers:
 | `scheduled_payments.csv` | 13 recurring/one-off obligations |
 | `financing_catalog.json` | 10 products: type, amount range, APR/fee/factor, term, days-to-fund, requirements |
 | `business_profile.json` | name, sector, founded, buffers, balances |
-| `sandbox_state.json` | reschedules, executed wires, buffer override (runtime only) |
+| `sandbox_state.json` | reschedules, executed wires, paid invoices, buffer override (runtime only) |
 | `audit_log.jsonl` | append-only event log (runtime only) |
 
 All synthetic, generated deterministically by `app/data_gen.py`
@@ -191,7 +210,8 @@ All synthetic, generated deterministically by `app/data_gen.py`
 | `GET /api/forecast` | 13-week projection | T0 |
 | `GET /api/financing` | ranked + rejected financing vs current gap | T0 |
 | `GET /api/financing/memo` | deterministic markdown decision memo (download) | T0 |
-| `POST /api/whatif` | scenario recompute | T1 |
+| `POST /api/whatif` | scenario recompute (UI can pin named scenarios to compare) | T1 |
+| `POST /api/data/upload?mode=append|replace` | bank-CSV ingest: column aliases, cp932/utf-8-sig, credit/debit forms, dup check, memo injection scan, forecast refit | T1 |
 | `POST /api/actions/{id}/approve` | consume approval → execute | T2 gate |
 | `POST /api/actions/{id}/reject` | reject proposal | T2 gate |
 | `GET /api/transactions?months=&category=&q=` | sanitized rows | T0 |

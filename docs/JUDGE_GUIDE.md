@@ -10,14 +10,14 @@ ranked action plan from live alerts + forecast, and each line names the next com
 
 | Rubric item | Where to see it | Try typing |
 |---|---|---|
-| CSV ingest + categorization | Transactions tab (162 rows, categories, PII masked, flagged memos marked) | `what is my biggest expense` |
+| CSV ingest + categorization | Transactions tab (1,235-row ledger, last-3-months view; categories, PII masked, flagged memos marked). **Data tab → Import bank CSV** uploads a real statement file (append/replace, dup check, memo injection scan, forecast refit) | `what is my biggest expense`, `can I upload my bank csv` |
 | 13-week forecast (real model) | Main chart + "Forecast model accuracy" fold — LightGBM vs seasonal-naive WAPE, **measured band coverage** | `give me the 13-week forecast`, `how accurate is the forecast` |
 | Alerts (low balance / clusters / overdue AR) | Alerts tab — grouped LOW_BALANCE with per-week evidence table | `when will I run out of cash`, `why is week 8 so low` |
 | P/L, margins, working capital | Analysis tab — monthly P/L, DSO/DPO/DIO, MoM drivers, code-written narrative | `what changed last month`, `compare this month to last` |
 | Financing matching + rejections | Financing tab — 10-product catalog, scores, **rejected with reasons**, `Download decision memo` | `what financing options cover the gap` |
-| Sandbox execution, approval-gated | Ask to reschedule → approval card with live TTL countdown → Approve → forecast re-projects | `reschedule pay-012 to 2026-12-08` |
+| Sandbox execution, approval-gated | Ask to reschedule → approval card with live TTL countdown → Approve → forecast re-projects. Four executable actions: reschedule, sandbox wire, buffer change, **mark invoice paid** | `reschedule pay-012 to 2026-12-08`, `mark INV-0014 as paid`, `wire $500 to Northwind` |
 | Operation log | Audit tab — color-coded, **"integrity verified — N events hash-chained"**, JSONL download | `show me the audit log` |
-| What-if | Sliders over the chart + chat scenarios | `increase prices 10 percent`, `what if my biggest customer pays late` |
+| What-if + scenario compare | Sliders over the chart + chat scenarios; **Pin as scenario** stacks named scenarios (A/B/C…) with a compare table (min, delta vs baseline, first breach) | `increase prices 10 percent`, `what if my biggest customer pays late` |
 | Category cost shock | Per-payment delta × occurrences in the 13-wk window (frequency-aware) | `what happens if rent goes up 15%`, `what if payroll goes up 10%` |
 | Working-capital answer | DSO/DPO/DIO + open & overdue AR | `how fast do customers pay me` |
 | Seasonality answer | Monthly revenue profile from the ledger | `is my business seasonal` |
@@ -51,4 +51,4 @@ ranked action plan from live alerts + forecast, and each line names the next com
 - Backtest WAPE: model beats seasonal-naive in **4/4** categories; band coverage 75–87.5%
 - Overdue AR: INV-0014 Northwind Catering, $2,929, 25d
 - Week-7 committed cluster: $22,450 (rent + equipment + loan)
-- 98 pytest cases, all green
+- 100 pytest cases, all green

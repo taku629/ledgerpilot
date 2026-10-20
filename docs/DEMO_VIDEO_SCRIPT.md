@@ -74,12 +74,19 @@ drivers table.
 > exports as a decision memo the owner can hand to their accountant.
 > Deterministic, dated, with the not-advice disclaimer attached."
 
-## Scene 5 — What-if (2:20–2:45)
+## Scene 5 — What-if (2:20–2:50)
 
 **Do:** Drag the **Sales** slider to −20% → **Apply what-if**.
 
 > "What if sales drop twenty percent? The scenario recomputes instantly —
 > the purple line is the new projection, the buffer breach moves earlier."
+
+**Do:** Click **Pin as scenario** — the line stays named *Scenario A*.
+Drag **AR delay** to +4w → Apply → **Pin** again → *Scenario B* appears
+in the compare table with min balance, delta vs baseline, first breach.
+
+> "Each what-if can be pinned and compared — three strategies side by side
+> on one chart, priced by the engine, not narrated."
 
 **Do:** Reset. Then in chat type **`what happens if rent goes up 15%`**.
 
@@ -88,7 +95,7 @@ drivers table.
 > shock at $2,520, dropping the floor to $14,158. Frequency-aware, not a
 > flat percentage guess."
 
-## Scene 6 — Sandbox action with approval (2:45–3:45)
+## Scene 6 — Sandbox action with approval (2:50–3:50)
 
 **Do:** Click the **"Reschedule equipment"** suggestion.
 
@@ -105,7 +112,7 @@ drivers table.
 > hash-chained: the Audit tab verifies the chain live, so a tampered
 > record can't hide."
 
-## Scene 7 — Injection defense (3:45–4:20)
+## Scene 7 — Injection defense (3:50–4:25)
 
 **Do:** Click the AR_OVERDUE alert → evidence modal → **"Draft a payment
 reminder"** button: the chat produces the dunning email for INV-0014.
@@ -122,7 +129,7 @@ reminder"** button: the chat produces the dunning email for INV-0014.
 > is also flagged. And a Tier-3 'real money' action? It doesn't exist —
 > it's disabled by design."
 
-## Scene 8 — Close (4:20–4:40)
+## Scene 8 — Close (4:25–4:45)
 
 **Screen:** Dashboard wide shot.
 
