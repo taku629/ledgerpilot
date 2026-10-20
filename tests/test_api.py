@@ -219,7 +219,7 @@ def test_csv_upload_append_flags_and_restore():
         csv_path.write_bytes(orig)
         import pandas as pd
         from app.main import ctx
-        ctx.txn = pd.read_csv(csv_path, parse_dates=["date"])
+        ctx.reload_transactions(pd.read_csv(csv_path, parse_dates=["date"]))
 
 
 def orig_rows():

@@ -6,7 +6,7 @@ import json
 import math
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi import Depends, FastAPI, HTTPException, Query, Request
 from fastapi.responses import FileResponse, JSONResponse, PlainTextResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
@@ -269,35 +269,144 @@ def audit_verify():
     return audit.verify()
 
 
+async def _read_capped(request: Request) -> bytes:
+    """Reads the request body but stops at ingest.MAX_BYTES + 1 so an
+    oversized upload is rejected without buffering it whole."""
+    cl = request.headers.get("content-length")
+    if cl and cl.isdigit() and int(cl) > ingest.MAX_BYTES:
+        raise HTTPException(413, f"file too large ({int(cl):,} bytes, "
+                                 f"max {ingest.MAX_BYTES:,})")
+    buf = bytearray()
+    async for chunk in request.stream():
+        buf.extend(chunk)
+        if len(buf) > ingest.MAX_BYTES:
+            raise HTTPException(413, f"file too large (max {ingest.MAX_BYTES:,} bytes)")
+    return bytes(buf)
+
+
+_MAP_Q = r"^[^\x00-\x1f]{0,80}$"
+
+
+def _mapping_params(date_col: str | None = Query(None, pattern=_MAP_Q),
+                    amount_col: str | None = Query(None, pattern=_MAP_Q),
+                    credit_col: str | None = Query(None, pattern=_MAP_Q),
+                    debit_col: str | None = Query(None, pattern=_MAP_Q),
+                    description_col: str | None = Query(None, pattern=_MAP_Q),
+                    type_col: str | None = Query(None, pattern=_MAP_Q),
+                    category_col: str | None = Query(None, pattern=_MAP_Q)) -> dict:
+    """Explicit column mapping (field → CSV header). Omitted = auto-detect,
+    '-' = ignore that field."""
+    m = {"date": date_col, "amount": amount_col, "credit": credit_col,
+         "debit": debit_col, "description": description_col,
+         "type": type_col, "category": category_col}
+    return {k: v for k, v in m.items() if v not in (None, "")}
+
+
+@app.post("/api/data/preview")
+async def preview_data(request: Request, mapping: dict = Depends(_mapping_params)):
+    """Mapping step (dry run): header, detected/explicit column mapping,
+    PII-masked + auto-categorized sample rows, category totals. Writes nothing."""
+    raw = await _read_capped(request)
+    try:
+        return ingest.preview_bank_csv(raw, mapping)
+    except ingest.IngestError as e:
+        raise HTTPException(422, str(e))
+    except Exception as e:
+        raise HTTPException(422, f"could not parse CSV: {e}")
+
+
 @app.post("/api/data/upload")
 async def upload_data(request: Request,
-                      mode: str = Query("append", pattern="^(append|replace)$")):
+                      mode: str = Query("append", pattern="^(append|replace)$"),
+                      opening_balance: float | None = Query(None, ge=-1e8, le=1e8),
+                      mapping: dict = Depends(_mapping_params)):
     """Import a bank-statement CSV (text/csv or text/plain body).
     Columns: date, amount (signed) or credit/debit, counterparty|description
-    [, category, type]. Capped at 1 MB / 5,000 rows; memos are PII-masked and
-    injection-scanned like any other ledger data."""
-    raw = await request.body()
+    [, category, type] — auto-detected, or mapped explicitly via *_col params.
+    Capped at 1 MB / 5,000 rows; memos are PII-masked and injection-scanned
+    like any other ledger data. The forecast is refit on the merged ledger."""
+    raw = await _read_capped(request)
     try:
-        new = ingest.parse_bank_csv(raw)
+        new = ingest.parse_bank_csv(raw, mapping)
     except ingest.IngestError as e:
         raise HTTPException(422, str(e))
     except Exception as e:
         raise HTTPException(422, f"could not parse CSV: {e}")
     import pandas as pd
     prev_n = len(ctx.txn)
+    before = ctx.forecast()
+    before = {"current_balance": ctx.profile["current_balance"],
+              "min_balance": before["min_balance"], "gap_week": before["gap_week"]}
     stats = ingest.merge_transactions(ctx.txn, new, mode, DATA_DIR)
-    ctx.txn = pd.read_csv(DATA_DIR / "transactions.csv", parse_dates=["date"])
+    ctx.reload_transactions(
+        pd.read_csv(DATA_DIR / "transactions.csv", parse_dates=["date"]),
+        opening_balance if mode == "replace" else None)
     fc = ctx.forecast()
     audit.record({"kind": "data_uploaded", "mode": mode,
                   "rows_parsed": len(new), "added": stats["added"],
                   "skipped_duplicates": stats["skipped_duplicates"],
                   "flagged_memos": len(stats["flagged_memos"]),
-                  "prev_rows": prev_n, "total": stats["total"]})
+                  "mapping": {k: v for k, v in mapping.items()},
+                  "prev_rows": prev_n, "total": stats["total"],
+                  "min_balance_before": before["min_balance"],
+                  "min_balance_after": fc["min_balance"]})
     return {**stats,
-            "forecast": {"min_balance": fc["min_balance"],
+            "categories": new.groupby("category").amount.sum().round(2).to_dict(),
+            "forecast_before": before,
+            "forecast": {"current_balance": ctx.profile["current_balance"],
+                         "min_balance": fc["min_balance"],
                          "gap_week": fc["gap_week"],
                          "gap_amount": fc["gap_amount"]},
             "backup": "transactions_backup.csv" if mode == "replace" else None}
+
+
+# ------------------------------------------------- named what-if scenarios
+class ScenarioIn(BaseModel):
+    name: str = Field(min_length=1, max_length=24, pattern=r"^[A-Za-z0-9][A-Za-z0-9 _-]*$")
+    params: WhatIfIn = Field(default_factory=WhatIfIn)
+
+
+def _scenario_row(name: str, params: dict, base: dict) -> dict:
+    fc = ctx.forecast(whatif=params) if params else base
+    return {"name": name, "params": params,
+            "min_balance": fc["min_balance"], "gap_week": fc["gap_week"],
+            "gap_amount": fc["gap_amount"],
+            "end_balance": fc["weeks"][-1]["balance_p50"],
+            "delta_vs_baseline": round(fc["min_balance"] - base["min_balance"], 2),
+            "series": [w["balance_p50"] for w in fc["weeks"]]}
+
+
+@app.get("/api/scenarios")
+def scenarios():
+    """Baseline + saved named scenarios, re-priced live against the current
+    ledger/schedule (so they move after a CSV import or approved action)."""
+    base = ctx.forecast()
+    rows = [_scenario_row("baseline", {}, base)]
+    rows += [_scenario_row(n, p, base) for n, p in sandbox.list_scenarios().items()]
+    return {"as_of": base["as_of"], "cash_buffer": ctx.profile["cash_buffer"],
+            "weeks": [w["start"] for w in base["weeks"]], "scenarios": rows}
+
+
+@app.post("/api/scenarios")
+def save_scenario(sc: ScenarioIn):
+    name = sc.name.strip()
+    if name.lower() == "baseline":
+        raise HTTPException(422, "'baseline' is reserved — it is always the live forecast")
+    params = {k: v for k, v in sc.params.model_dump().items() if v not in (0, None)}
+    try:
+        sandbox.save_scenario(name, params)
+    except ValueError as e:
+        raise HTTPException(409, str(e))
+    audit.record({"kind": "scenario_saved", "name": name, "params": params})
+    return scenarios()
+
+
+@app.delete("/api/scenarios/{name}")
+def delete_scenario(name: str):
+    if not sandbox.delete_scenario(name):
+        raise HTTPException(404, f"no saved scenario '{name}'")
+    audit.record({"kind": "scenario_deleted", "name": name})
+    return scenarios()
 
 
 @app.post("/api/dev/regenerate")
@@ -309,8 +418,13 @@ def regenerate():
         sandbox.STATE_PATH.unlink(missing_ok=True)
     except OSError:
         pass
-    ctx.scheduled = sandbox.apply_reschedules(ctx.scheduled_raw)
     generate(out_dir=DATA_DIR)
+    fresh = load_all()
+    ctx.scheduled_raw = fresh["scheduled"]
+    ctx.scheduled = sandbox.apply_reschedules(ctx.scheduled_raw)
+    ctx.invoices = fresh["invoices"]
+    ctx.profile.update(fresh["profile"])
+    ctx.reload_transactions(fresh["transactions"])
     audit.record({"kind": "data_regenerated"})
     return {"ok": True}
 

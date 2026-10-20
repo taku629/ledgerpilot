@@ -38,6 +38,22 @@ class BusinessContext:
         self.approvals = approvals
         self._forecast_cache = {}
 
+    def reload_transactions(self, txn: pd.DataFrame,
+                            opening_balance: float | None = None):
+        """Swap in a new ledger (CSV import): balance is re-derived from the
+        ledger and every cached forecast is dropped so the next read refits."""
+        self.txn = txn
+        if opening_balance is not None:
+            self.profile["start_balance"] = float(opening_balance)
+        start = float(self.profile.get("start_balance", 0))
+        self.profile["current_balance"] = round(
+            start + float(txn[txn.flow == "inflow"].amount.sum())
+            - float(txn[txn.flow == "outflow"].amount.sum()), 2)
+        dates = pd.to_datetime(txn["date"])
+        self.profile["data_window"] = {"start": str(dates.min().date()),
+                                       "end": str(dates.max().date())}
+        self._forecast_cache.clear()
+
     def forecast(self, whatif: dict | None = None, use_cache: bool = True) -> dict:
         key = fingerprint(whatif or {})
         if use_cache and key in self._forecast_cache:
@@ -298,7 +314,9 @@ def execute_approved(ctx: BusinessContext, action: dict) -> dict:
             ctx._forecast_cache.clear()
         return res
     if name == "mark_invoice_paid":
-        return sandbox.exec_mark_invoice_paid(ctx.invoices, p["invoice_id"])
+        res = sandbox.exec_mark_invoice_paid(ctx.invoices, p["invoice_id"])
+        ctx._forecast_cache.clear()
+        return res
     return {"ok": False, "error": f"unknown action tool {name}"}
 
 

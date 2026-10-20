@@ -124,3 +124,9 @@ tr.hl td{color:var(--warn)}
 .scnTable th {color:#8b96a7;font-weight:600;font-size:11px;text-transform:uppercase}
 .scnDot {display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px}
 .scnTable .neg {color:#ff5a65}
+
+/* CSV import mapping + scenario name */
+.csvMapGrid{display:flex;flex-wrap:wrap;gap:8px}
+.csvMapGrid label{display:flex;flex-direction:column;font-size:11px;color:var(--dim);gap:3px}
+.csvMapGrid select{background:#0d1420;border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:4px 6px;font-size:12px}
+#wiName{background:#0d1420;border:1px solid var(--line);color:var(--txt);border-radius:6px;padding:4px 6px;font-size:12px}

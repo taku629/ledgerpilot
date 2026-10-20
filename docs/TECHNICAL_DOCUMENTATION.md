@@ -129,20 +129,39 @@ products stay visible with their reasons** ("too slow: 14d vs gap in week 2")
 
 ### 2.4a Bank-CSV ingest (`app/ingest.py`)
 
-`POST /api/data/upload` accepts a raw bank statement CSV and merges it into
+Flow: **upload → column mapping → classification → forecast refit**.
+`POST /api/data/preview` is the dry-run mapping step: it returns the header,
+the detected mapping (`date, amount | credit+debit, description, type,
+category`), PII-masked + categorized sample rows and per-category totals, and
+writes nothing. `POST /api/data/upload` accepts the same body plus optional
+explicit mapping (`date_col=…&amount_col=…`, `-` = ignore) and merges it into
 the transaction ledger:
 
 - **Robust parse** — utf-8-sig → cp932 fallback, column aliases
   (date/posted/value_date…; amount/balance/金額…; separate credit/debit
   columns supported), `$`/`¥` stripping, ISO-ish and `YYYY/M/D` dates,
-  >10% unparseable dates or >1 MB / >5,000 rows → HTTP 422.
+  header normalisation (`Posted Date`, `Withdrawals`, 日付/金額/摘要/入金/出金),
+  `(75.00)` negatives. Rejections: body >1 MB → 413 (checked on
+  `Content-Length` and while streaming), >5,000 rows, binary/xlsx/PDF magic
+  bytes, <2 columns, unknown mapped column, >10% unparseable dates → 422.
 - **Safety** — counterparty free-text is PII-masked before storage; up to
   500 memo fields per file are run through the injection scanner and
   flagged hits are returned in the response.
 - **Merge modes** — `append` dedupes on (date, amount, counterparty);
   `replace` snapshots the old ledger to `transactions_backup.csv` first.
-- After a merge the in-memory ledger is reloaded so forecasts/KPIs recompute
-  on the new data.
+- After a merge `BusinessContext.reload_transactions` re-derives the current
+  balance from the ledger (optional `opening_balance` for `replace`), clears
+  every cached forecast and refits; the response and the audit event carry
+  min balance before → after.
+
+### 2.4b Named scenarios
+
+`GET/POST /api/scenarios`, `DELETE /api/scenarios/{name}` — what-if params
+saved by name (max 5, `baseline` reserved and always the live forecast) in
+the sandbox state file. Every read re-prices each scenario through the same
+`forecast_cashflow` engine as `/api/whatif`, returning min balance, delta vs
+baseline, first breach, week-13 balance and the 13-week P50 series for the
+chart. The `compare my scenarios` chat intent renders the same table.
 
 ### 2.4 Agent (`app/agent.py`)
 
@@ -210,8 +229,10 @@ All synthetic, generated deterministically by `app/data_gen.py`
 | `GET /api/forecast` | 13-week projection | T0 |
 | `GET /api/financing` | ranked + rejected financing vs current gap | T0 |
 | `GET /api/financing/memo` | deterministic markdown decision memo (download) | T0 |
-| `POST /api/whatif` | scenario recompute (UI can pin named scenarios to compare) | T1 |
-| `POST /api/data/upload?mode=append|replace` | bank-CSV ingest: column aliases, cp932/utf-8-sig, credit/debit forms, dup check, memo injection scan, forecast refit | T1 |
+| `POST /api/whatif` | scenario recompute | T1 |
+| `GET/POST /api/scenarios`, `DELETE /api/scenarios/{name}` | named what-if scenarios (baseline/A/B) re-priced live | T1 |
+| `POST /api/data/preview` | CSV mapping step: detected/explicit mapping, masked categorized sample (dry run) | T0 |
+| `POST /api/data/upload?mode=append|replace&*_col=` | bank-CSV ingest: explicit or auto column mapping, cp932/utf-8-sig, credit/debit forms, dup check, memo injection scan, forecast refit | T1 |
 | `POST /api/actions/{id}/approve` | consume approval → execute | T2 gate |
 | `POST /api/actions/{id}/reject` | reject proposal | T2 gate |
 | `GET /api/transactions?months=&category=&q=` | sanitized rows | T0 |

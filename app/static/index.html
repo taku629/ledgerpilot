@@ -36,6 +36,8 @@
       <button data-q="What happens if rent goes up 15%?">What-if: rent +15%</button>
       <button data-q="Draft a payment reminder for the overdue invoice">Dunning draft</button>
       <button data-q="Reschedule the equipment payment to 2027-01-05">Reschedule equipment</button>
+      <button data-q="Mark INV-0014 paid">Mark INV-0014 paid</button>
+      <button data-q="Compare my scenarios">Compare scenarios</button>
     </div>
     <form id="chatForm">
       <input id="chatInput" autocomplete="off" placeholder="Ask LedgerPilot… e.g. 'forecast cash flow', 'what if sales drop 20%', 'draft a loan application'">
@@ -56,7 +58,8 @@
           <label>Supplies <input type="range" id="wiSup" min="-20" max="50" value="0"><span id="wiSupV">0%</span></label>
           <label>AR delay <input type="range" id="wiAR" min="0" max="6" value="0"><span id="wiARV">0w</span></label>
           <button id="wiApply">Apply what-if</button>
-          <button id="wiPin" class="ghost" disabled>Pin as scenario</button>
+          <input id="wiName" maxlength="24" placeholder="name (A)" style="width:84px">
+          <button id="wiPin" class="ghost" disabled>Save as scenario</button>
           <button id="wiReset" class="ghost">Reset</button>
         </div>
       </div>
@@ -93,11 +96,20 @@
       <details open style="margin:4px 0 10px"><summary class="fineprint" style="cursor:pointer">Committed scheduled payments (pay-###)
         — these land inside the forecast weeks</summary>
         <div id="schedTable"></div></details>
-      <div class="row" style="margin-bottom:8px">
-        <input type="file" id="csvFile" accept=".csv,text/csv" style="max-width:230px">
-        <button id="csvUpload">Import bank CSV</button>
-        <label class="fineprint"><input type="checkbox" id="csvReplace"> replace ledger</label>
-        <span id="csvResult" class="fineprint"></span>
+      <details open style="margin:4px 0 10px"><summary class="fineprint" style="cursor:pointer">Open receivables (AR) —
+        "Mark paid…" proposes a Tier-2 action that needs your approval</summary>
+        <div id="arTable"></div></details>
+      <div class="card" style="margin-bottom:10px;padding:10px 12px">
+        <div class="fineprint" style="margin-bottom:6px"><b>Import bank CSV</b> — Step 1: choose a file
+          (≤1 MB, ≤5,000 rows; .csv only). Nothing is written until you click Import.</div>
+        <div class="row" style="margin-bottom:0;align-items:center">
+          <input type="file" id="csvFile" accept=".csv,text/csv" style="max-width:260px;flex:0">
+          <button id="csvUpload" disabled>Import</button>
+          <label class="fineprint"><input type="checkbox" id="csvReplace" style="flex:0"> replace ledger (backup kept)</label>
+          <span id="csvResult" class="fineprint"></span>
+          <button id="demoReset" class="ghost" style="margin-left:auto;font-size:11px" title="Regenerates the synthetic demo ledger; audit log is kept">Reset demo data</button>
+        </div>
+        <div id="csvMap"></div>
       </div>
       <div class="row">
         <select id="txnMonths"><option value="1">Last month</option><option value="3" selected>Last 3 months</option><option value="6">Last 6 months</option></select>
